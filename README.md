@@ -1,4 +1,152 @@
-# AI ContentCraft
+<div align="right">
+  <a href="#chinese">中文</a> | <a href="#english">English</a>
+</div>
+
+<h1 id="english">AI ContentCraft</h1>
+
+AI ContentCraft is a versatile content creation tool that integrates text generation, speech synthesis, and image generation capabilities. It helps creators quickly generate stories, podcast scripts, and accompanying audio-visual content.
+
+## Features
+
+- 🎯 Story Generation: Automatically generate short stories based on themes
+- 📝 Script Conversion: Convert stories into standard script format
+- 🎙️ Podcast Content: Generate podcast outlines and dialogue scripts
+- 🗣️ Speech Synthesis: Text-to-speech support with multiple voices
+- 🎨 Image Generation: Generate illustrations for story scenes
+- 🌐 Bilingual Support: Support for Chinese-English content conversion
+- 📊 Batch Processing: Support batch generation and download of content
+
+## Tech Stack
+
+- Frontend: HTML/JavaScript
+- Backend: Node.js + Express
+- AI Services:
+  - DeepSeek AI: Text generation
+  - Kokoro TTS: Speech synthesis
+  - Replicate: Image generation
+- Other tools: FFmpeg (audio processing)
+
+## Prerequisites
+
+- Node.js 16+
+- FFmpeg
+- API keys for AI services
+  - DeepSeek AI account and API key
+  - Replicate account and API token
+- Stable internet connection
+
+## Quick Start
+
+1. Clone the project and install dependencies:
+```bash
+git clone https://github.com/nicekate/AI-ContentCraft.git
+cd AI-ContentCraft
+
+# Install project dependencies
+npm install dotenv express kokoro-js openai replicate
+
+# Install dev dependencies
+npm install -D nodemon
+```
+
+2. Configure environment variables:
+Create a `.env` file and add the following configuration:
+```bash
+DEEPSEEK_API_KEY=your_deepseek_api_key
+REPLICATE_API_TOKEN=your_replicate_token
+```
+
+3. Install FFmpeg:
+Ensure FFmpeg is installed on your system and update the FFmpeg path in `server.js`:
+```javascript
+const ffmpegPath = 'your_ffmpeg_path';
+```
+
+4. Start the server:
+```bash
+npm run dev
+```
+
+5. Access the application:
+Open your browser and visit `http://localhost:3000`
+
+## Usage Guide
+
+### Story Generation
+1. Input story theme
+2. Click to generate story
+3. Optionally convert to script format
+4. Generate accompanying scene images
+
+### Podcast Content
+1. Input podcast theme
+2. Generate podcast outline
+3. Convert to dialogue script
+4. Choose different voices for dubbing
+
+### Audio Processing
+1. Support voiceover for multiple text segments
+2. Automatically merge multiple audio clips
+3. Provide audio preview and download
+
+### Image Generation
+1. Automatically generate prompts for scenes
+2. Batch generate scene images
+3. Provide image preview and batch download
+4. Auto-generate image showcase page
+
+## API Endpoints
+
+Main endpoints include:
+- `/generate-story`: Generate story
+- `/generate-script`: Convert script
+- `/generate-podcast`: Generate podcast content
+- `/generate`: Single text to speech
+- `/generate-and-merge`: Multiple text to speech and merge
+- `/generate-image`: Generate image
+- `/translate-podcast`: Podcast script translation
+- `/translate-story-script`: Story script translation
+
+## Notes
+
+- Valid API keys are required for AI services
+- Audio merging requires proper FFmpeg configuration
+- Recommended for local development environment
+- Mind API call limits and costs
+
+## Error Handling
+
+Common issues and solutions:
+
+1. API Call Failures
+   - Check if API keys are correct
+   - Verify API call quota
+   - Check specific error messages
+
+2. Audio Processing Issues
+   - Confirm FFmpeg installation
+   - Check audio file format
+   - Review server logs
+
+3. Image Generation Failures
+   - Check Replicate API quota
+   - Verify prompt compliance
+   - Review error responses
+
+## Contributing
+
+1. Fork the project
+2. Create feature branch
+3. Submit changes
+4. Create Pull Request
+
+## License
+
+MIT
+
+---
+
+<h1 id="chinese">AI ContentCraft</h1>
 
 AI ContentCraft 是一个多功能的内容创作工具，集成了文本生成、语音合成、图像生成等功能。它可以帮助创作者快速生成故事、播客脚本和配套的音视频内容。
 
