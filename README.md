@@ -24,7 +24,7 @@ AI ContentCraft is a versatile content creation tool that integrates text genera
   - DeepSeek AI: Text generation (using [DeepSeek Chat API](https://platform.deepseek.com/))
   - Kokoro TTS: Speech synthesis (using [Kokoro-82M-ONNX model](https://huggingface.co/onnx-community/Kokoro-82M-ONNX))
   - Replicate: Image generation (using [Replicate API](https://replicate.com/))
-- Other tools: FFmpeg (audio processing)
+- Other tools: FFmpeg (audio processing) ([FFmpeg official site](https://ffmpeg.org/))
 
 ## Prerequisites
 
@@ -168,7 +168,7 @@ AI ContentCraft 是一个多功能的内容创作工具，集成了文本生成�
   - DeepSeek AI: 文本生成（使用 [DeepSeek Chat API](https://platform.deepseek.com/)）
   - Kokoro TTS: 语音合成（使用 [Kokoro-82M-ONNX 模型](https://huggingface.co/onnx-community/Kokoro-82M-ONNX)）
   - Replicate: 图像生成（使用 [Replicate API](https://replicate.com/)）
-- 其他工具：FFmpeg (音频处理)
+- 其他工具：FFmpeg (音频处理) ([FFmpeg 官网](https://ffmpeg.org/))
 
 ## 前置条件
 
