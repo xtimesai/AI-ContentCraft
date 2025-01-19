@@ -1,0 +1,2251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI ContentCraft</title>
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --background-color: #f5f7fa;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--background-color);
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            width: 90%;
+            max-width: 600px;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            margin-bottom: 1.5rem;
+        }
+
+        textarea {
+            width: 100%;
+            height: 120px;
+            border: 2px solid #e1e4e8;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 16px;
+            resize: vertical;
+            transition: border-color 0.3s;
+        }
+
+        textarea:focus {
+            border-color: var(--primary-color);
+            outline: none;
+        }
+
+        .button-container {
+            display: flex;
+            gap: 10px;
+            margin: 1rem 0;
+        }
+
+        button {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 12px 24px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button:hover {
+            background: #357abd;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .progress-container {
+            margin: 1rem 0;
+            display: none;
+        }
+
+        .progress-bar {
+            height: 4px;
+            background: #e1e4e8;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress {
+            height: 100%;
+            background: var(--primary-color);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        .audio-container {
+            margin-top: 1rem;
+            width: 100%;
+        }
+
+        audio {
+            width: 100%;
+        }
+
+        .spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .history-container {
+            margin-top: 1rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px;
+            border-bottom: 1px solid #e1e4e8;
+        }
+
+        .voice-select-container {
+            margin: 1rem 0;
+        }
+
+        .voice-select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e1e4e8;
+            border-radius: 8px;
+            font-size: 16px;
+            background-color: white;
+            cursor: pointer;
+        }
+
+        .voice-select:focus {
+            border-color: var(--primary-color);
+            outline: none;
+        }
+
+        .tabs-container {
+            margin: 1rem 0;
+            width: 100%;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 1rem;
+        }
+
+        .tab-btn {
+            padding: 8px 16px;
+            border: none;
+            background: #4a90e2;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .tab-btn:hover {
+            background: #357abd;
+        }
+
+        .tab-btn.active {
+            background: #28a745;
+            color: white;
+        }
+
+        .tab-btn.add-tab {
+            background: #ff9800;
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+            border-radius: 4px;
+        }
+
+        .tab-btn.add-tab:hover {
+            background: #f57c00;
+        }
+
+        .tab-panels {
+            position: relative;
+        }
+
+        .tab-panel {
+            display: none;
+            gap: 1rem;
+        }
+
+        .tab-panel.active {
+            display: block;
+        }
+
+        .text-input {
+            margin-bottom: 1rem;
+        }
+
+        .story-container,
+        .script-container {
+            margin-bottom: 2rem;
+        }
+
+        h2 {
+            color: var(--primary-color);
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+        }
+
+        #storyText,
+        #scriptText {
+            margin-top: 1rem;
+            min-height: 150px;
+        }
+
+        .theme-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 2px solid #e1e4e8;
+            border-radius: 8px;
+            font-size: 16px;
+            margin-bottom: 1rem;
+        }
+
+        .theme-input:focus {
+            border-color: var(--primary-color);
+            outline: none;
+        }
+
+        .script-section {
+            margin-bottom: 1rem;
+            padding: 1rem;
+            border: 1px solid #e1e4e8;
+            border-radius: 8px;
+            background: #f8f9fa;
+            cursor: move;
+        }
+
+        .script-section.dragging {
+            opacity: 0.5;
+            border: 2px dashed var(--primary-color);
+        }
+
+        .script-section .drag-handle {
+            cursor: move;
+            padding: 4px;
+            margin-right: 8px;
+            color: #666;
+        }
+
+        .drag-placeholder {
+            border: 2px dashed #ccc;
+            margin-bottom: 1rem;
+            height: 100px;
+            border-radius: 8px;
+            background: #f1f1f1;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .section-controls {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .voice-select {
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid #e1e4e8;
+        }
+
+        .delete-btn {
+            background: #dc3545;
+            padding: 4px 8px;
+        }
+
+        .character-input {
+            margin-bottom: 0.5rem;
+            padding: 4px 8px;
+            border: 1px solid #e1e4e8;
+            border-radius: 4px;
+        }
+
+        .progress-text {
+            margin-bottom: 0.5rem;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .nav-bar {
+            background: var(--primary-color);
+            padding: 1rem;
+            margin-bottom: 2rem;
+            border-radius: 8px;
+            display: flex;
+            gap: 1rem;
+        }
+
+        .nav-button {
+            background: transparent;
+            color: white;
+            border: 1px solid white;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .nav-button:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .nav-button.active {
+            background: white;
+            color: var(--primary-color);
+        }
+
+        .page {
+            display: none;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        .simple-tts-container {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .multi-tts-container {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .button-container {
+            display: flex;
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .action-btn {
+            background: #e1e4e8;
+            color: #24292e;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .action-btn:hover {
+            background: #d1d5da;
+        }
+
+        .primary-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .primary-btn:hover {
+            opacity: 0.9;
+        }
+
+        .script-controls {
+            display: flex;
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .script-section {
+            position: relative;
+            margin-bottom: 1rem;
+        }
+
+        .section-type {
+            position: absolute;
+            top: 0.5rem;
+            left: 0.5rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: white;
+        }
+
+        .section-type.narration {
+            background: #6c757d;
+        }
+
+        .section-type.dialogue {
+            background: #28a745;
+        }
+
+        .character-input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 0.5rem;
+            border: 1px solid #e1e4e8;
+            border-radius: 4px;
+        }
+
+        .character-label {
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+            padding: 4px 8px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .section-type {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: white;
+            margin-right: 1rem;
+        }
+
+        .section-type.narration {
+            background: #6c757d;
+        }
+
+        .section-type.dialogue {
+            background: #28a745;
+        }
+
+        .section-content {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .podcast-container {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .topic-section {
+            margin-bottom: 2rem;
+        }
+
+        .topic-input {
+            width: 100%;
+            min-height: 150px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border: 2px solid #e1e4e8;
+            border-radius: 8px;
+            resize: vertical;
+        }
+
+        .voice-selection {
+            margin-bottom: 2rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .character-voices {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .voice-select-group {
+            flex: 1;
+        }
+
+        .voice-select-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--primary-color);
+            font-weight: bold;
+        }
+
+        .podcast-sections {
+            margin: 1rem 0;
+        }
+
+        .podcast-dialog {
+            position: relative;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border: 1px solid #e1e4e8;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+
+        .host-label {
+            position: absolute;
+            top: 0.5rem;
+            left: 0.5rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: white;
+        }
+
+        .host-a {
+            background: #007bff;
+        }
+
+        .host-b {
+            background: #28a745;
+        }
+
+        .story-image-container {
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        #storyImageDisplay {
+            margin-top: 10px;
+            min-height: 200px;
+            border: 1px solid #ddd;
+            padding: 10px;
+            background: #f8f9fa;
+        }
+
+        #storyImage {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        #generateImageBtn {
+            padding: 8px 16px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        #generateImageBtn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav-bar">
+            <button class="nav-button active" onclick="switchPage('story')">Story Generator</button>
+            <button class="nav-button" onclick="switchPage('simple')">Simple TTS</button>
+            <button class="nav-button" onclick="switchPage('multi')">Multi-Voice TTS</button>
+            <button class="nav-button" onclick="switchPage('podcast')">Podcast Generator</button>
+        </div>
+
+        <!-- Story Generator Page -->
+        <div id="storyPage" class="page active">
+            <!-- 故事生成部分 -->
+            <div class="story-container">
+                <h1>Story Generation</h1>
+                <input type="text" id="themeInput" class="theme-input" placeholder="Enter story theme...">
+                <button onclick="generateStory()" id="generateStoryBtn">Generate Story</button>
+                <textarea id="storyText" class="text-input" placeholder="Generated story will appear here..."></textarea>
+            </div>
+
+            <!-- 脚本转换部分 -->
+            <div class="script-container">
+                <h2>Script</h2>
+                <div class="script-buttons">
+                    <button onclick="generateScript()" id="convertToScript" class="btn primary">Convert to Script</button>
+                    <div class="button-row">
+                        <button onclick="generateStoryAudio()" id="generateStoryAudioBtn" class="btn secondary" style="display: none;">
+                            <span class="spinner"></span>
+                            <span id="storyBtnText">Generate Audio</span>
+                        </button>
+                        <button onclick="downloadAllImages()" id="downloadImages" class="btn secondary" style="display: none;">Download All Images</button>
+                    </div>
+                </div>
+                <div id="scriptSections">
+                    <!-- 脚本段落将在这里动态生成 -->
+                </div>
+                <div class="progress-container" id="storyProgressContainer" style="display: none;">
+                    <div class="progress-text">Generating: <span id="storyCurrentProgress">0</span>/<span id="storyTotalSections">0</span></div>
+                    <div class="progress-bar">
+                        <div class="progress" id="storyProgress"></div>
+                    </div>
+                </div>
+                <div class="audio-container">
+                    <audio id="storyAudioPlayer" controls>
+                        <source src="" type="audio/wav">
+                    </audio>
+                </div>
+            </div>
+        </div>
+
+        <!-- Simple TTS Page -->
+        <div id="simplePage" class="page">
+            <div class="simple-tts-container">
+                <h1>Simple Text to Speech</h1>
+                <textarea 
+                    id="simpleTtsText" 
+                    class="text-input" 
+                    placeholder="Enter text to convert to speech..."
+                    style="min-height: 150px;"
+                ></textarea>
+                <div class="voice-select-container">
+                    <select id="simpleTtsVoice" class="voice-select">
+                        <!-- 声音选项将通过 JavaScript 动态添加 -->
+                    </select>
+                </div>
+                <div class="button-container">
+                    <button onclick="generateSimpleTTS()" id="simpleTtsBtn">
+                        <span class="spinner" id="simpleTtsSpinner"></span>
+                        <span id="simpleTtsButtonText">Generate Audio</span>
+                    </button>
+                </div>
+                <div class="audio-container">
+                    <audio id="simpleTtsPlayer" controls>
+                        <source src="" type="audio/wav">
+                    </audio>
+                </div>
+            </div>
+        </div>
+
+        <!-- Multi-Voice TTS Page -->
+        <div id="multiPage" class="page">
+            <div class="multi-tts-container">
+                <h1>Multi-Voice TTS</h1>
+                
+                <div class="tabs-container">
+                    <div class="tabs">
+                        <button class="tab-btn active" onclick="switchTab(0)">Section 1</button>
+                        <button class="tab-btn" onclick="switchTab(1)">Section 2</button>
+                        <button class="tab-btn add-tab" onclick="addNewTab()">+</button>
+                    </div>
+                    <div class="tab-panels">
+                        <div class="tab-panel active">
+                            <textarea class="text-input" placeholder="Enter text to convert to speech..."></textarea>
+                            <div class="voice-select-container">
+                                <select class="voice-select">
+                                    <option value="">加载中...</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="tab-panel">
+                            <textarea class="text-input" placeholder="Enter text to convert to speech..."></textarea>
+                            <div class="voice-select-container">
+                                <select class="voice-select">
+                                    <option value="">加载中...</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="button-container">
+                    <button onclick="generateAllAudio()" id="generateBtn">
+                        <span class="spinner" id="spinner"></span>
+                        <span id="btnText">Generate All Audio</span>
+                    </button>
+                    <button onclick="exportMergedAudio()" id="exportBtn">Export Merged Audio</button>
+                </div>
+
+                <div class="progress-container" id="progressContainer">
+                    <div class="progress-bar">
+                        <div class="progress" id="progress"></div>
+                    </div>
+                </div>
+
+                <div class="audio-container">
+                    <audio id="multiAudioPlayer" controls>
+                        <source src="" type="audio/wav">
+                    </audio>
+                </div>
+
+                <div class="history-container" id="historyContainer">
+                    <!-- 历史记录将在这里动态添加 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Podcast Generator Page -->
+        <div id="podcastPage" class="page">
+            <div class="podcast-container">
+                <h1>Podcast Generator</h1>
+                
+                <!-- 主题输入区域 -->
+                <div class="topic-section">
+                    <textarea 
+                        id="podcastTopic" 
+                        class="topic-input" 
+                        placeholder="Enter your podcast topic or content here..."
+                        rows="6"
+                    ></textarea>
+                    <button onclick="generatePodcastContent()" id="generatePodcastBtn" class="primary-btn">
+                        <span class="spinner" id="podcastSpinner"></span>
+                        <span id="podcastBtnText">Generate Podcast</span>
+                    </button>
+                </div>
+
+                <!-- 脚本编辑区域 -->
+                <div class="script-editor" id="podcastScriptEditor" style="display: none;">
+                    <div class="voice-selection">
+                        <h3>Select Voices for Characters</h3>
+                        <div class="character-voices">
+                            <div class="voice-select-group">
+                                <label>Host A:</label>
+                                <select id="hostAVoice" class="voice-select">
+                                    <!-- 声音选项将通过 JavaScript 动态添加 -->
+                                </select>
+                            </div>
+                            <div class="voice-select-group">
+                                <label>Host B:</label>
+                                <select id="hostBVoice" class="voice-select">
+                                    <!-- 声音选项将通过 JavaScript 动态添加 -->
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="script-controls">
+                        <button onclick="generatePodcastScript()" id="generateScriptBtn" class="action-btn">Convert to Script</button>
+                        <button onclick="addPodcastDialog('A')" class="action-btn">Add Host A</button>
+                        <button onclick="addPodcastDialog('B')" class="action-btn">Add Host B</button>
+                        <button onclick="translateAndDownload()" id="translateBtn" class="action-btn">
+                            Translate & Download
+                        </button>
+                    </div>
+
+                    <div id="podcastSections" class="podcast-sections">
+                        <!-- 对话段落将在这里动态生成 -->
+                    </div>
+
+                    <div class="button-container">
+                        <button onclick="generatePodcastAudio()" id="generatePodcastAudioBtn" class="primary-btn">
+                            <span class="spinner" id="podcastAudioSpinner"></span>
+                            <span id="podcastAudioBtnText">Generate Audio</span>
+                        </button>
+                    </div>
+
+                    <div class="progress-container" id="podcastProgressContainer" style="display: none;">
+                        <div class="progress-text">
+                            Generating: <span id="podcastCurrentProgress">0</span>/<span id="podcastTotalSections">0</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress" id="podcastProgress"></div>
+                        </div>
+                    </div>
+
+                    <div class="audio-container">
+                        <audio id="podcastAudioPlayer" controls>
+                            <source src="" type="audio/wav">
+                        </audio>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let voices = [];
+
+        async function loadVoices() {
+            try {
+                const response = await fetch('/voices');
+                voices = await response.json();
+                
+                // 更新所有语音选择下拉框
+                updateAllVoiceSelects();
+                
+                // 更新简单TTS的语音选择
+                const simpleTtsVoice = document.getElementById('simpleTtsVoice');
+                if (simpleTtsVoice) {
+                    const voiceOptionsHtml = voices.map(voice => 
+                        `<option value="${voice.id}">${voice.name} (${voice.language}, ${voice.gender})</option>`
+                    ).join('');
+                    simpleTtsVoice.innerHTML = voiceOptionsHtml;
+                    simpleTtsVoice.value = 'af_nicole';
+                }
+            } catch (error) {
+                console.error('加载声音失败:', error);
+                voices = [
+                    { id: "af_nicole", name: "Nicole (Default)", language: "en-us", gender: "Female" }
+                ];
+                updateAllVoiceSelects();
+            }
+        }
+
+        function updateAllVoiceSelects() {
+            const voiceSelects = document.querySelectorAll('.voice-select');
+            const voiceOptionsHtml = voices.map(voice => 
+                `<option value="${voice.id}">${voice.name} (${voice.language}, ${voice.gender})</option>`
+            ).join('');
+            
+            voiceSelects.forEach(select => {
+                select.innerHTML = voiceOptionsHtml;
+                select.value = 'af_nicole';
+            });
+        }
+
+        // 页面加载时获取声音列表
+        loadVoices();
+
+        function startProgressSimulation() {
+            progress.style.width = '0%';
+            let width = 0;
+            const interval = setInterval(() => {
+                if (width >= 90) {
+                    clearInterval(interval);
+                    return;
+                }
+                width += Math.random() * 10;
+                progress.style.width = Math.min(width, 90) + '%';
+            }, 200);
+        }
+
+        function addToHistory(filename, text, voice) {
+            const item = document.createElement('div');
+            item.className = 'history-item';
+            const timestamp = new Date().toLocaleTimeString();
+            item.innerHTML = `
+                <span>${timestamp}</span>
+                <audio controls src="${filename}"></audio>
+                <div class="history-text">
+                    <div>${text.substring(0, 30)}${text.length > 30 ? '...' : ''}</div>
+                    <div class="voice-name">Voice: ${voice}</div>
+                </div>
+            `;
+            historyContainer.insertBefore(item, historyContainer.firstChild);
+        }
+
+        let currentTab = 0;
+        let audioBuffers = [];
+
+        function switchTab(index) {
+            const tabs = document.querySelectorAll('.tab-btn:not(.add-tab)');
+            const panels = document.querySelectorAll('.tab-panel');
+            
+            tabs.forEach(tab => tab.classList.remove('active'));
+            panels.forEach(panel => panel.classList.remove('active'));
+            
+            tabs[index].classList.add('active');
+            panels[index].classList.add('active');
+            currentTab = index;
+        }
+
+        function addNewTab() {
+            const tabs = document.querySelector('.tabs');
+            const panels = document.querySelector('.tab-panels');
+            const newIndex = document.querySelectorAll('.tab-btn:not(.add-tab)').length;
+            
+            // 添加新标签按钮
+            const tabBtn = document.createElement('button');
+            tabBtn.className = 'tab-btn';
+            tabBtn.textContent = `Section ${newIndex + 1}`;
+            tabBtn.onclick = () => switchTab(newIndex);
+            tabs.insertBefore(tabBtn, tabs.lastElementChild);
+            
+            // 添加新面板
+            const panel = document.createElement('div');
+            panel.className = 'tab-panel';
+            panel.innerHTML = `
+                <textarea class="text-input" placeholder="Enter text to convert to speech..."></textarea>
+                <div class="voice-select-container">
+                    <select class="voice-select">
+                        ${document.querySelector('.voice-select').innerHTML}
+                    </select>
+                </div>
+            `;
+            panels.appendChild(panel);
+            
+            // 设置默认语音为 Nicole
+            const voiceSelect = panel.querySelector('.voice-select');
+            voiceSelect.value = 'af_nicole';
+            
+            // 切换到新标签
+            switchTab(newIndex);
+        }
+
+        async function generateAllAudio() {
+            const panels = document.querySelectorAll('.tab-panel');
+            const generateBtn = document.getElementById('generateBtn');
+            const spinner = document.getElementById('spinner');
+            const btnText = document.getElementById('btnText');
+            const progressContainer = document.getElementById('storyProgressContainer');
+            const progress = document.getElementById('storyProgress');
+            
+            const sectionsData = Array.from(panels).map(panel => ({
+                text: panel.querySelector('.text-input').value.trim(),
+                voice: panel.querySelector('.voice-select').value
+            })).filter(s => s.text && s.voice);
+
+            if (sectionsData.length === 0) {
+                alert('Please enter text to convert');
+                return;
+            }
+
+            generateBtn.disabled = true;
+            spinner.style.display = 'inline-block';
+            btnText.textContent = 'Generating...';
+            progressContainer.style.display = 'block';
+            progress.style.width = '0%';
+
+            try {
+                const response = await fetch('/generate-and-merge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sections: sectionsData })
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+
+                    const lines = decoder.decode(value).split('\n');
+                    for (const line of lines) {
+                        if (!line.trim()) continue;
+                        
+                        try {
+                            const data = JSON.parse(line);
+                            if (data.type === 'progress') {
+                                progress.style.width = `${(data.current / data.total) * 100}%`;
+                            } else if (data.type === 'complete' && data.success) {
+                                const audioPlayer = document.getElementById('multiAudioPlayer');
+                                audioPlayer.src = data.filename;
+                                audioPlayer.load();
+                                
+                                // 启用导出按钮
+                                document.getElementById('exportBtn').disabled = false;
+                                
+                                // 添加到历史记录
+                                addToHistory(data.filename, `Combined Audio (${sectionsData.length} sections)`, 'Multiple');
+                            }
+                        } catch (e) {
+                            console.warn('Failed to parse line:', line, e);
+                        }
+                    }
+                }
+            } catch (error) {
+                alert('Generation failed: ' + error.message);
+            } finally {
+                generateBtn.disabled = false;
+                spinner.style.display = 'none';
+                btnText.textContent = 'Generate All Audio';
+            }
+        }
+
+        async function exportMergedAudio() {
+            const audioPlayer = document.getElementById('multiAudioPlayer');
+            if (!audioPlayer.src) {
+                alert('Please generate audio first');
+                return;
+            }
+
+            try {
+                // 创建下载链接
+                const link = document.createElement('a');
+                link.href = audioPlayer.src;
+                link.download = `merged-${new Date().toISOString().replace(/[:.]/g, '-')}.wav`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } catch (error) {
+                alert('Export failed: ' + error.message);
+            }
+        }
+
+        async function generateStory() {
+            const theme = document.getElementById('themeInput').value.trim();
+            if (!theme) {
+                alert('Please enter a story theme');
+                return;
+            }
+
+            const generateStoryBtn = document.getElementById('generateStoryBtn');
+            const storyText = document.getElementById('storyText');
+            
+            generateStoryBtn.disabled = true;
+            generateStoryBtn.textContent = 'Generating...';
+            
+            try {
+                const response = await fetch('/generate-story', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ theme })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    storyText.value = data.story;
+                } else {
+                    alert('生成故事失败: ' + data.error);
+                }
+            } catch (error) {
+                alert('生成故事失败: ' + error.message);
+            } finally {
+                generateStoryBtn.disabled = false;
+                generateStoryBtn.textContent = 'Generate Story';
+            }
+        }
+
+        async function generateScript() {
+            const storyText = document.getElementById('storyText').value;
+            if (!storyText) {
+                alert('Please generate a story first');
+                return;
+            }
+
+            const convertToScript = document.getElementById('convertToScript');
+            
+            // 设置按钮为生成中状态
+            convertToScript.disabled = true;
+            convertToScript.style.backgroundColor = '#ccc';  // 灰色背景
+            convertToScript.textContent = 'Generating...';
+            
+            const scriptSections = document.getElementById('scriptSections');
+            scriptSections.innerHTML = ''; // 清空现有内容
+            
+            try {
+                const response = await fetch('/generate-script', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ story: storyText })
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    
+                    const lines = decoder.decode(value).split('\n');
+                    for (const line of lines) {
+                        if (!line) continue;
+                        
+                        const data = JSON.parse(line);
+                        switch (data.type) {
+                            case 'status':
+                                convertToScript.textContent = data.message;
+                                break;
+                            case 'complete':
+                                if (data.success && data.script && data.script.scenes) {
+                                    // 为每个场景创建一个段落
+                                    data.script.scenes.forEach((scene, index) => {
+                                        const section = createScriptSection(scene, index);
+                                        scriptSections.appendChild(section);
+                                    });
+
+                                    // 显示所有按钮
+                                    document.getElementById('generateStoryAudioBtn').style.display = 'block';
+                                    document.getElementById('downloadImages').style.display = 'block';
+                                    
+                                    // 添加脚本控制按钮
+                                    const scriptControls = document.createElement('div');
+                                    scriptControls.className = 'script-controls';
+                                    scriptControls.style.marginTop = '20px';
+                                    scriptControls.style.display = 'flex';
+                                    scriptControls.style.gap = '10px';
+                                    scriptControls.innerHTML = `
+                                        <button onclick="addScriptSection('narration')" class="btn secondary">
+                                            Add Narration
+                                        </button>
+                                        <button onclick="addScriptSection('dialogue')" class="btn secondary">
+                                            Add Dialogue
+                                        </button>
+                                        <button onclick="downloadScript('json')" class="btn secondary">
+                                            Download JSON
+                                        </button>
+                                        <button onclick="downloadScript('txt')" class="btn secondary">
+                                            Download TXT
+                                        </button>
+                                    `;
+                                    scriptSections.appendChild(scriptControls);
+                                    
+                                    // 添加批量生成图片的按钮
+                                    scriptSections.appendChild(createImageButtons());
+                                }
+                                break;
+                            case 'error':
+                                throw new Error(data.error);
+                        }
+                    }
+                }
+            } catch (error) {
+                alert('Failed to convert script: ' + error.message);
+            } finally {
+                // 恢复按钮状态
+                convertToScript.disabled = false;
+                convertToScript.style.backgroundColor = '#4a90e2';  // 恢复原来的蓝色
+                convertToScript.textContent = 'Convert to Script';
+            }
+        }
+
+        // 修改 createImageButtons 函数
+        function createImageButtons() {
+            const buttonContainer = document.createElement('div');
+            buttonContainer.className = 'button-container';
+            buttonContainer.style.marginTop = '20px';
+            buttonContainer.style.display = 'flex';
+            buttonContainer.style.gap = '10px';
+            buttonContainer.innerHTML = `
+                <button onclick="generateStoryAudio()" class="primary-btn">
+                    Generate Audio
+                </button>
+                <button onclick="generateAllImages()" id="generateAllImagesBtn" class="primary-btn">
+                    Generate All Images
+                </button>
+                <button onclick="downloadAllImages()" class="primary-btn">
+                    Download All Images
+                </button>
+            `;
+            return buttonContainer;
+        }
+
+        function createScriptSection(scene, index) {
+            const section = document.createElement('div');
+            section.className = 'script-section';
+            section.draggable = true;
+            section.id = `section-${Date.now()}-${index}`;
+            
+            // 添加拖动事件
+            section.addEventListener('dragstart', handleDragStart);
+            section.addEventListener('dragend', handleDragEnd);
+            section.addEventListener('dragover', handleDragOver);
+            section.addEventListener('drop', handleDrop);
+
+            const header = document.createElement('div');
+            header.className = 'section-header';
+
+            // 添加类型标签
+            const typeLabel = document.createElement('span');
+            typeLabel.className = `section-type ${scene.type}`;
+            typeLabel.textContent = scene.type === 'narration' ? 'Narration' : 'Dialogue';
+            header.appendChild(typeLabel);
+
+            // 添加控制按钮
+            const controls = document.createElement('div');
+            controls.className = 'section-controls';
+
+            // 添加语音选择
+            const voiceSelect = document.createElement('select');
+            voiceSelect.className = 'voice-select';
+            const voiceOptionsHtml = voices.map(voice => 
+                `<option value="${voice.id}">${voice.name} (${voice.language}, ${voice.gender})</option>`
+            ).join('');
+            voiceSelect.innerHTML = voiceOptionsHtml;
+            voiceSelect.value = scene.type === 'dialogue' ? 'am_michael' : 'af_nicole'; // 对话用男声，旁白用女声
+
+            // 添加删除按钮
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'delete-btn';
+            deleteBtn.textContent = 'Delete';
+            deleteBtn.onclick = () => section.remove();
+
+            controls.appendChild(voiceSelect);
+            controls.appendChild(deleteBtn);
+            header.appendChild(controls);
+
+            const content = document.createElement('div');
+            content.className = 'section-content';
+
+            // 如果是对话，添加角色名显示
+            if (scene.type === 'dialogue' && scene.character) {
+                const characterLabel = document.createElement('div');
+                characterLabel.className = 'character-label';
+                characterLabel.textContent = scene.character;
+                content.appendChild(characterLabel);
+            }
+
+            // 添加文本区域
+            const textarea = document.createElement('textarea');
+            textarea.className = 'text-input';
+            textarea.value = scene.text;
+            textarea.placeholder = scene.type === 'dialogue' ? 'Enter dialogue...' : 'Enter narration...';
+            content.appendChild(textarea);
+
+            section.appendChild(header);
+            section.appendChild(content);
+
+            // 添加图片容器
+            const imageContainer = document.createElement('div');
+            imageContainer.className = 'section-image-container';
+            imageContainer.innerHTML = `
+                <button class="generate-image-btn">Generate Image</button>
+                <div class="image-loading" style="display: none;">
+                    <span class="spinner"></span>
+                    <span>Generating image...</span>
+                </div>
+                <div class="image-prompt" style="display: none;"></div>
+                <div class="image-preview">
+                    <img style="max-width: 100%; display: none;" />
+                    <button class="regenerate-btn" style="display: none;">Regenerate</button>
+                </div>
+            `;
+            
+            // 绑定生成图片按钮事件
+            const generateImageBtn = imageContainer.querySelector('.generate-image-btn');
+            generateImageBtn.onclick = () => generateSectionImage(section, scene.text);
+            
+            section.appendChild(imageContainer);
+            return section;
+        }
+
+        async function generateSectionImage(section, text, isRegenerate = false) {
+            if (!text) {
+                alert('No text available for image generation');
+                return;
+            }
+
+            const imageContainer = section.querySelector('.section-image-container');
+            const generateBtn = imageContainer.querySelector('.generate-image-btn');
+            const loading = imageContainer.querySelector('.image-loading');
+            const preview = imageContainer.querySelector('.image-preview');
+            const promptDiv = imageContainer.querySelector('.image-prompt');
+            const img = preview.querySelector('img');
+            const regenerateBtn = preview.querySelector('.regenerate-btn');
+            
+            generateBtn.disabled = true;
+            loading.style.display = 'flex';
+            img.style.display = 'none';
+            promptDiv.style.display = 'none';
+            regenerateBtn.style.display = 'none';
+            
+            try {
+                // 1. 生成提示词
+                const promptResponse = await fetch('/generate-image-prompt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        text: text,
+                        context: document.getElementById('storyText').value 
+                    })
+                });
+                
+                if (!promptResponse.ok) {
+                    throw new Error(`Failed to generate prompt: ${promptResponse.status}`);
+                }
+                
+                const promptData = await promptResponse.json();
+                if (!promptData.success || !promptData.prompt) {
+                    throw new Error('Invalid prompt response');
+                }
+
+                // 2. 使用提示词生成图片
+                const imageResponse = await fetch('/generate-image', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        prompt: promptData.prompt,
+                        sectionId: section.id,
+                        seed: isRegenerate ? Math.floor(Math.random() * 1000000) : 1234
+                    })
+                });
+                
+                if (!imageResponse.ok) {
+                    throw new Error(`Failed to generate image: ${imageResponse.status}`);
+                }
+                
+                const imageData = await imageResponse.json();
+                if (!imageData.success) {
+                    throw new Error(imageData.error || 'Failed to generate image');
+                }
+
+                // 增强的 URL 处理逻辑
+                let imageUrl;
+                if (Array.isArray(imageData.imageUrl)) {
+                    imageUrl = imageData.imageUrl[0];
+                } else if (typeof imageData.imageUrl === 'string') {
+                    imageUrl = imageData.imageUrl;
+                } else if (typeof imageData.imageUrl === 'object' && imageData.imageUrl !== null) {
+                    imageUrl = imageData.imageUrl.url || imageData.imageUrl.output || imageData.imageUrl.image;
+                }
+
+                // URL 验证
+                if (!imageUrl || typeof imageUrl !== 'string') {
+                    throw new Error('Invalid image URL format');
+                }
+
+                if (!imageUrl.startsWith('http')) {
+                    throw new Error('Invalid image URL protocol');
+                }
+
+                // 3. 显示结果
+                promptDiv.textContent = promptData.prompt;
+                promptDiv.style.display = 'block';
+
+                // 创建新图片元素
+                const newImg = document.createElement('img');
+                newImg.style.maxWidth = '100%';
+                newImg.style.display = 'none';
+                
+                // 设置加载事件
+                newImg.onload = () => {
+                    loading.style.display = 'none';
+                    newImg.style.display = 'block';
+                    regenerateBtn.style.display = 'block';
+                };
+                
+                // 设置错误事件
+                newImg.onerror = () => {
+                    loading.style.display = 'none';
+                    console.error('Failed to load image:', imageUrl);
+                    throw new Error('Failed to load image from URL');
+                };
+
+                // 设置图片属性
+                newImg.src = imageUrl;
+                newImg.dataset.prompt = promptData.prompt;
+                
+                // 替换旧图片
+                const oldImg = preview.querySelector('img');
+                if (oldImg) {
+                    preview.replaceChild(newImg, oldImg);
+                } else {
+                    preview.appendChild(newImg);
+                }
+                
+                // 更新重新生成按钮的事件处理
+                regenerateBtn.onclick = () => generateSectionImage(section, text, true);
+                
+            } catch (error) {
+                console.error('Image generation error:', error);
+                loading.style.display = 'none';
+                alert('Failed to generate image: ' + error.message);
+            } finally {
+                generateBtn.disabled = false;
+            }
+        }
+
+        function openImageModal(url, prompt) {
+            const modal = document.createElement('div');
+            modal.className = 'image-modal';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <img src="${url}" alt="Generated image" />
+                    <p class="prompt-text">${prompt}</p>
+                    <button onclick="this.closest('.image-modal').remove()">Close</button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        async function generateStoryAudio() {
+            const sections = document.querySelectorAll('.script-section');
+            const generateBtn = document.getElementById('generateStoryAudioBtn');
+            const progressContainer = document.getElementById('storyProgressContainer');
+            const progressBar = document.getElementById('storyProgress');
+            const currentProgress = document.getElementById('storyCurrentProgress');
+            const totalSections = document.getElementById('storyTotalSections');
+
+            generateBtn.disabled = true;
+            const spinner = generateBtn.querySelector('.spinner');
+            const btnText = generateBtn.querySelector('#storyBtnText');
+            spinner.style.display = 'inline-block';
+            btnText.textContent = 'Generating...';
+            progressContainer.style.display = 'block';
+
+            try {
+                const sectionsData = Array.from(sections).map(section => ({
+                    text: section.querySelector('.text-input').value,
+                    voice: section.querySelector('.voice-select').value
+                }));
+
+                const response = await fetch('/generate-and-merge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sections: sectionsData })
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+
+                    const lines = decoder.decode(value).split('\n');
+                    for (const line of lines) {
+                        if (!line.trim()) continue;
+                        
+                        try {
+                            const data = JSON.parse(line);
+                            if (data.type === 'progress') {
+                                currentProgress.textContent = data.current;
+                                totalSections.textContent = data.total;
+                                progressBar.style.width = `${(data.current / data.total) * 100}%`;
+                            } else if (data.type === 'complete' && data.success) {
+                                const audioPlayer = document.getElementById('storyAudioPlayer');
+                                audioPlayer.src = data.filename;
+                                audioPlayer.load();
+                            }
+                        } catch (e) {
+                            console.warn('Failed to parse line:', line, e);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Audio generation error:', error);
+                alert('Failed to generate audio: ' + error.message);
+            } finally {
+                generateBtn.disabled = false;
+                spinner.style.display = 'none';
+                btnText.textContent = 'Generate Audio';
+            }
+        }
+
+        let draggedElement = null;
+
+        function handleDragStart(e) {
+            draggedElement = this;
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/html', this.innerHTML);
+        }
+
+        function handleDragEnd(e) {
+            this.classList.remove('dragging');
+            draggedElement = null;
+            
+            document.querySelectorAll('.drag-placeholder').forEach(p => p.remove());
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+
+            const container = document.getElementById('scriptSections');
+            const sections = [...container.children];
+            
+            if (this !== draggedElement) {
+                const draggedRect = draggedElement.getBoundingClientRect();
+                const targetRect = this.getBoundingClientRect();
+                const draggedIndex = sections.indexOf(draggedElement);
+                const targetIndex = sections.indexOf(this);
+                
+                if (draggedIndex < targetIndex) {
+                    this.parentNode.insertBefore(draggedElement, this.nextSibling);
+                } else {
+                    this.parentNode.insertBefore(draggedElement, this);
+                }
+            }
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        // 页面切换函数
+        function switchPage(pageId) {
+            // 更新导航按钮状态
+            document.querySelectorAll('.nav-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            const activeBtn = document.querySelector(`.nav-button[onclick*="${pageId}"]`);
+            if (activeBtn) activeBtn.classList.add('active');
+
+            // 更新页面显示
+            document.querySelectorAll('.page').forEach(page => {
+                page.classList.remove('active');
+            });
+            const activePage = document.getElementById(`${pageId}Page`);
+            if (activePage) activePage.classList.add('active');
+        }
+
+        // 简单TTS生成函数
+        async function generateSimpleTTS() {
+            const text = document.getElementById('simpleTtsText').value.trim();
+            const voice = document.getElementById('simpleTtsVoice').value;
+            
+            if (!text) {
+                alert('Please enter some text');
+                return;
+            }
+
+            const button = document.getElementById('simpleTtsBtn');
+            const spinner = document.getElementById('simpleTtsSpinner');
+            const buttonText = document.getElementById('simpleTtsButtonText');
+
+            // 更新按钮状态
+            button.disabled = true;
+            spinner.style.display = 'inline-block';
+            buttonText.textContent = 'Generating...';
+
+            try {
+                const response = await fetch('/generate-and-merge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sections: [{
+                            text: text,
+                            voice: voice
+                        }]
+                    })
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+
+                    const lines = decoder.decode(value).split('\n');
+                    for (const line of lines) {
+                        if (!line.trim()) continue;
+                        
+                        try {
+                            const data = JSON.parse(line);
+                            if (data.type === 'complete' && data.success) {
+                                const audioPlayer = document.getElementById('simpleTtsPlayer');
+                                audioPlayer.src = data.filename;
+                                audioPlayer.load();
+                            }
+                        } catch (e) {
+                            console.warn('Failed to parse line:', line, e);
+                        }
+                    }
+                }
+            } catch (error) {
+                alert('Audio generation failed: ' + error.message);
+            } finally {
+                // 恢复按钮状态
+                button.disabled = false;
+                spinner.style.display = 'none';
+                buttonText.textContent = 'Generate Audio';
+            }
+        }
+
+        async function generateMultiAudio() {
+            const sections = document.querySelectorAll('.script-section');
+            if (sections.length === 0) {
+                alert('No sections to generate audio from');
+                return;
+            }
+
+            const generateBtn = document.getElementById('generateMultiBtn');
+            const spinner = document.getElementById('multiSpinner');
+            const buttonText = document.getElementById('multiButtonText');
+            const progressContainer = document.getElementById('multiProgressContainer');
+            const progressBar = document.getElementById('multiProgress');
+            const currentProgress = document.getElementById('currentProgress');
+            const totalSections = document.getElementById('totalSections');
+
+            // 设置初始状态
+            generateBtn.disabled = true;
+            spinner.style.display = 'inline-block';
+            buttonText.textContent = 'Generating...';
+            progressContainer.style.display = 'block';
+            totalSections.textContent = sections.length;
+            currentProgress.textContent = '0';
+            progressBar.style.width = '0%';
+
+            try {
+                // 收集所有段落数据
+                const sectionsData = Array.from(sections).map(section => {
+                    const textarea = section.querySelector('textarea');
+                    const voiceSelect = section.querySelector('.voice-select');
+                    return {
+                        text: textarea.value.trim(),
+                        voice: voiceSelect.value
+                    };
+                }).filter(s => s.text && s.voice);
+
+                if (sectionsData.length === 0) {
+                    throw new Error('No valid text sections found');
+                }
+
+                // 一次性发送所有数据进行处理
+                const response = await fetch('/generate-and-merge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sections: sectionsData })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    // 更新音频播放器
+                    const audioPlayer = document.getElementById('multiAudioPlayer');
+                    audioPlayer.src = data.filename;
+                    audioPlayer.load();
+                    
+                    // 设置进度为 100%
+                    currentProgress.textContent = sections.length;
+                    progressBar.style.width = '100%';
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                alert('Audio generation failed: ' + error.message);
+            } finally {
+                // 恢复按钮状态
+                generateBtn.disabled = false;
+                spinner.style.display = 'none';
+                buttonText.textContent = 'Generate Audio';
+                
+                // 延迟隐藏进度条
+                setTimeout(() => {
+                    progressContainer.style.display = 'none';
+                    progressBar.style.width = '0%';
+                }, 1000);
+            }
+        }
+
+        // 添加播客相关的 JavaScript 函数
+        async function generatePodcastContent() {
+            const topic = document.getElementById('podcastTopic').value.trim();
+            if (!topic) {
+                alert('Please enter a topic');
+                return;
+            }
+
+            const button = document.getElementById('generatePodcastBtn');
+            const spinner = document.getElementById('podcastSpinner');
+            const btnText = document.getElementById('podcastBtnText');
+
+            button.disabled = true;
+            spinner.style.display = 'inline-block';
+            btnText.textContent = 'Generating...';
+
+            try {
+                const response = await fetch('/generate-podcast', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ topic })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    document.getElementById('podcastTopic').value = data.content;
+                    document.getElementById('podcastScriptEditor').style.display = 'block';
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                alert('Failed to generate podcast content: ' + error.message);
+            } finally {
+                button.disabled = false;
+                spinner.style.display = 'none';
+                btnText.textContent = 'Generate Podcast';
+            }
+        }
+
+        async function generatePodcastScript() {
+            const content = document.getElementById('podcastTopic').value.trim();
+            if (!content) {
+                alert('Please generate or enter podcast content first');
+                return;
+            }
+
+            const button = document.getElementById('generateScriptBtn');
+            button.disabled = true;
+            button.textContent = 'Converting...';
+
+            try {
+                const response = await fetch('/generate-podcast-script', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    const container = document.getElementById('podcastSections');
+                    container.innerHTML = '';
+                    
+                    data.script.forEach((dialog, index) => {
+                        const section = createPodcastDialog(dialog.host, dialog.text, index);
+                        container.appendChild(section);
+                    });
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                alert('Failed to convert to script: ' + error.message);
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Convert to Script';
+            }
+        }
+
+        function createPodcastDialog(host, text, index) {
+            const section = document.createElement('div');
+            section.className = 'podcast-dialog';
+            section.draggable = true;
+            section.dataset.index = index;
+
+            // 添加拖拽事件
+            section.addEventListener('dragstart', handleDragStart);
+            section.addEventListener('dragend', handleDragEnd);
+            section.addEventListener('dragover', handleDragOver);
+            section.addEventListener('drop', handleDrop);
+
+            const hostLabel = document.createElement('div');
+            hostLabel.className = `host-label host-${host.toLowerCase()}`;
+            hostLabel.textContent = `Host ${host}`;
+            section.appendChild(hostLabel);
+
+            const textarea = document.createElement('textarea');
+            textarea.className = 'text-input';
+            textarea.value = text;
+            section.appendChild(textarea);
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'delete-btn';
+            deleteBtn.textContent = 'Delete';
+            deleteBtn.onclick = () => section.remove();
+            section.appendChild(deleteBtn);
+
+            return section;
+        }
+
+        function addPodcastDialog(host) {
+            const container = document.getElementById('podcastSections');
+            const section = createPodcastDialog(host, '', container.children.length);
+            container.appendChild(section);
+        }
+
+        async function generatePodcastAudio() {
+            const sections = document.querySelectorAll('.podcast-dialog');
+            const topic = document.getElementById('podcastTopic').value.trim();
+            
+            if (sections.length === 0) {
+                alert('No dialog sections found');
+                return;
+            }
+
+            const hostAVoice = document.getElementById('hostAVoice').value;
+            const hostBVoice = document.getElementById('hostBVoice').value;
+
+            const button = document.getElementById('generatePodcastAudioBtn');
+            const spinner = document.getElementById('podcastAudioSpinner');
+            const btnText = document.getElementById('podcastAudioBtnText');
+            const progressContainer = document.getElementById('podcastProgressContainer');
+            const progress = document.getElementById('podcastProgress');
+            const currentProgress = document.getElementById('podcastCurrentProgress');
+            const totalSections = document.getElementById('podcastTotalSections');
+
+            button.disabled = true;
+            spinner.style.display = 'inline-block';
+            btnText.textContent = 'Generating...';
+            progressContainer.style.display = 'block';
+            totalSections.textContent = sections.length;
+            currentProgress.textContent = '0';
+            progress.style.width = '0%';
+
+            try {
+                const sectionsData = Array.from(sections).map(section => {
+                    const host = section.querySelector('.host-label').textContent.includes('A') ? 'A' : 'B';
+                    return {
+                        text: section.querySelector('textarea').value.trim(),
+                        voice: host === 'A' ? hostAVoice : hostBVoice
+                    };
+                }).filter(s => s.text);
+
+                const response = await fetch('/generate-and-merge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        sections: sectionsData,
+                        theme: topic.substring(0, 20)
+                    })
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    
+                    const lines = decoder.decode(value).split('\n');
+                    for (const line of lines) {
+                        if (!line) continue;
+                        
+                        const data = JSON.parse(line);
+                        switch (data.type) {
+                            case 'progress':
+                                currentProgress.textContent = data.current;
+                                progress.style.width = `${(data.current / data.total) * 100}%`;
+                                break;
+                            case 'status':
+                                btnText.textContent = data.message;
+                                break;
+                            case 'complete':
+                                if (data.success) {
+                                    const audioPlayer = document.getElementById('podcastAudioPlayer');
+                                    audioPlayer.src = data.filename;
+                                    audioPlayer.load();
+                                    progress.style.width = '100%';
+                                }
+                                break;
+                            case 'error':
+                                throw new Error(data.error);
+                        }
+                    }
+                }
+            } catch (error) {
+                alert('Failed to generate audio: ' + error.message);
+            } finally {
+                button.disabled = false;
+                spinner.style.display = 'none';
+                btnText.textContent = 'Generate Audio';
+                
+                setTimeout(() => {
+                    progressContainer.style.display = 'none';
+                    progress.style.width = '0%';
+                }, 1000);
+            }
+        }
+
+        async function generateStoryImage() {
+            const storyText = document.getElementById('storyText').value;
+            if (!storyText) {
+                alert('Please generate a story first');
+                return;
+            }
+
+            const btn = document.getElementById('generateImageBtn');
+            const imgContainer = document.getElementById('storyImage');
+            const imgDisplay = document.getElementById('storyImageDisplay');
+            
+            btn.disabled = true;
+            btn.textContent = 'Generating...';
+            imgDisplay.style.display = 'block';
+            imgContainer.style.display = 'none';
+            
+            try {
+                // 生成 prompt
+                const promptResponse = await fetch('/generate-image-prompt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: storyText })
+                });
+                
+                if (!promptResponse.ok) {
+                    throw new Error(`Prompt generation failed: ${promptResponse.status}`);
+                }
+                
+                const promptData = await promptResponse.json();
+                if (!promptData.success || !promptData.prompt) {
+                    throw new Error('Invalid prompt response');
+                }
+
+                // 生成图片
+                const imageResponse = await fetch('/generate-image', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        prompt: promptData.prompt,
+                        sectionId: 'story'
+                    })
+                });
+                
+                if (!imageResponse.ok) {
+                    throw new Error(`Image generation failed: ${imageResponse.status}`);
+                }
+                
+                const imageData = await imageResponse.json();
+                console.log('Image generation response:', imageData);
+
+                if (!imageData.success || !imageData.imageUrl) {
+                    throw new Error('No image URL in response');
+                }
+
+                // 确保 imageUrl 是字符串
+                if (typeof imageData.imageUrl !== 'string') {
+                    throw new Error('Invalid image URL format');
+                }
+
+                // 设置图片
+                imgContainer.onload = () => {
+                    console.log('Image loaded successfully');
+                    imgContainer.style.display = 'block';
+                };
+                
+                imgContainer.onerror = (e) => {
+                    console.error('Image load error:', e);
+                    throw new Error('Failed to load image');
+                };
+
+                imgContainer.src = imageData.imageUrl;
+                imgContainer.alt = 'Generated story image';
+                
+            } catch (error) {
+                console.error('Image generation error:', error);
+                alert('Failed to generate image: ' + error.message);
+                imgContainer.style.display = 'none';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Generate Image';
+            }
+        }
+
+        // 添加批量下载功能
+        async function downloadAllImages() {
+            const sections = document.querySelectorAll('.script-section');
+            const images = [];
+            
+            sections.forEach(section => {
+                const img = section.querySelector('.image-preview img');
+                const promptDiv = section.querySelector('.image-prompt');
+                
+                if (img && img.src && img.src.startsWith('http')) {
+                    images.push({
+                        url: img.src,
+                        prompt: promptDiv.textContent || img.dataset.prompt || ''
+                    });
+                }
+            });
+            
+            console.log('Images to download:', images); // 添加日志
+            
+            if (images.length === 0) {
+                alert('No images to download');
+                return;
+            }
+            
+            const theme = document.getElementById('themeInput').value.trim() || 'story';
+            
+            try {
+                const response = await fetch('/download-images', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ images, theme })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    alert(`Successfully downloaded ${data.totalImages} images to:\n${data.directory}\n\nA gallery.html file has been created for preview.`);
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                console.error('Download error:', error);
+                alert('Failed to download images: ' + error.message);
+            }
+        }
+
+        // 添加生成所有图片的函数
+        async function generateAllImages() {
+            const sections = Array.from(document.querySelectorAll('.script-section')).map(section => ({
+                id: section.id,
+                text: section.querySelector('.text-input').value
+            }));
+
+            if (sections.length === 0) {
+                alert('No script sections found');
+                return;
+            }
+
+            const btn = document.getElementById('generateAllImagesBtn');
+            btn.disabled = true;
+            btn.textContent = 'Generating...';
+
+            // 添加进度显示容器
+            const progressContainer = document.createElement('div');
+            progressContainer.className = 'generation-progress';
+            progressContainer.innerHTML = `
+                <div class="progress-text">Initializing...</div>
+                <div class="progress-bar">
+                    <div class="progress" style="width: 0%"></div>
+                </div>
+            `;
+            btn.parentNode.insertBefore(progressContainer, btn.nextSibling);
+
+            try {
+                const response = await fetch('/generate-all-images', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sections })
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+
+                    const lines = decoder.decode(value).split('\n');
+                    for (const line of lines) {
+                        if (!line) continue;
+
+                        const data = JSON.parse(line);
+                        const progressText = progressContainer.querySelector('.progress-text');
+                        const progressBar = progressContainer.querySelector('.progress');
+
+                        switch (data.type) {
+                            case 'status':
+                                progressText.textContent = data.message;
+                                break;
+                            case 'prompt_progress':
+                                progressText.textContent = `${data.message} - Generating prompts...`;
+                                progressBar.style.width = `${(data.current / data.total) * 50}%`; // 提示词生成占总进度的50%
+                                break;
+                            case 'image_progress':
+                                progressText.textContent = `${data.message} - Generating images...`;
+                                progressBar.style.width = `${50 + (data.current / data.total) * 50}%`; // 图片生成占后50%
+                                break;
+                            case 'section_complete':
+                                const section = document.getElementById(data.sectionId);
+                                if (section) {
+                                    const imageContainer = section.querySelector('.section-image-container');
+                                    const preview = imageContainer.querySelector('.image-preview');
+                                    const img = preview.querySelector('img');
+                                    const promptDiv = imageContainer.querySelector('.image-prompt');
+                                    const regenerateBtn = preview.querySelector('.regenerate-btn');
+                                    const loading = imageContainer.querySelector('.image-loading');
+
+                                    promptDiv.textContent = data.prompt;
+                                    promptDiv.style.display = 'block';
+                                    
+                                    // 改进图片加载逻辑
+                                    loading.style.display = 'flex';
+                                    
+                                    // 清除旧的事件监听器
+                                    const newImg = img.cloneNode(false);
+                                    
+                                    newImg.onload = () => {
+                                        console.log('Image loaded successfully:', data.imageUrl);
+                                        loading.style.display = 'none';
+                                        newImg.style.display = 'block';
+                                        regenerateBtn.style.display = 'block';
+                                    };
+                                    
+                                    newImg.onerror = () => {
+                                        console.error('Failed to load image:', data.imageUrl);
+                                        loading.style.display = 'none';
+                                        alert(`Failed to load image for section ${data.sectionId}`);
+                                    };
+
+                                    // 设置新图片的属性
+                                    newImg.src = data.imageUrl;
+                                    newImg.dataset.prompt = data.prompt;
+                                    newImg.style.maxWidth = '100%';
+                                    newImg.style.display = 'none';
+                                    
+                                    // 替换旧图片
+                                    img.parentNode.replaceChild(newImg, img);
+                                    
+                                    regenerateBtn.onclick = () => generateSectionImage(section, section.querySelector('.text-input').value);
+                                }
+                                break;
+                            case 'complete':
+                                progressText.textContent = 'All images generated successfully!';
+                                progressBar.style.width = '100%';
+                                setTimeout(() => {
+                                    progressContainer.remove();
+                                }, 3000);
+                                break;
+                            case 'error':
+                                throw new Error(data.error);
+                        }
+                    }
+                }
+            } catch (error) {
+                alert('Failed to generate images: ' + error.message);
+                progressContainer.remove();
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Generate All Images';
+            }
+        }
+
+        // 添加新的函数来处理添加脚本段落
+        function addScriptSection(type) {
+            const scriptSections = document.getElementById('scriptSections');
+            const scene = {
+                type: type,
+                text: '',
+                character: type === 'dialogue' ? 'Character Name' : undefined
+            };
+            
+            // 在控制按钮之前插入新段落
+            const controls = scriptSections.querySelector('.script-controls');
+            const section = createScriptSection(scene, Date.now());
+            scriptSections.insertBefore(section, controls);
+        }
+
+        // 添加下载脚本的函数
+        async function downloadScript(format = 'json') {
+            const scriptSections = document.getElementById('scriptSections');
+            const sections = Array.from(scriptSections.querySelectorAll('.script-section'));
+            
+            if (format === 'json') {
+                // JSON 格式下载 (保持不变)
+                const scriptData = {
+                    scenes: sections.map(section => {
+                        const type = section.querySelector('.section-type').textContent.toLowerCase();
+                        const text = section.querySelector('.text-input').value;
+                        const characterLabel = section.querySelector('.character-label');
+                        
+                        return {
+                            type: type,
+                            text: text,
+                            ...(characterLabel && { character: characterLabel.textContent })
+                        };
+                    })
+                };
+
+                const blob = new Blob([JSON.stringify(scriptData, null, 2)], { type: 'application/json' });
+                downloadFile(blob, `script-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
+            } else if (format === 'txt') {
+                // TXT 格式下载 (添加翻译功能)
+                try {
+                    // 准备英文内容
+                    const englishContent = sections.map(section => {
+                        const type = section.querySelector('.section-type').textContent;
+                        const text = section.querySelector('.text-input').value;
+                        const characterLabel = section.querySelector('.character-label');
+                        
+                        if (characterLabel) {
+                            return `[${type}]\n${characterLabel.textContent}:\n${text}`;
+                        } else {
+                            return `[${type}]\n${text}`;
+                        }
+                    }).join('\n\n');
+
+                    // 发送翻译请求
+                    const response = await fetch('/translate-story-script', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ script: englishContent })
+                    });
+
+                    const data = await response.json();
+                    if (!data.success) {
+                        throw new Error(data.error);
+                    }
+
+                    // 合并英文和中文内容
+                    const downloadContent = englishContent + '\n\n=== Chinese Translation ===\n\n' + data.translation;
+
+                    // 下载双语文件
+                    const blob = new Blob([downloadContent], { type: 'text/plain' });
+                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                    downloadFile(blob, `story-script-bilingual-${timestamp}.txt`);
+
+                } catch (error) {
+                    alert('Translation failed: ' + error.message);
+                    
+                    // 如果翻译失败，仍然下载英文版本
+                    const blob = new Blob([englishContent], { type: 'text/plain' });
+                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                    downloadFile(blob, `story-script-${timestamp}.txt`);
+                }
+            }
+        }
+
+        // 辅助函数：处理文件下载
+        function downloadFile(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+        // 添加翻译和下载函数
+        async function translateAndDownload() {
+            const podcastSections = document.getElementById('podcastSections');
+            if (!podcastSections || podcastSections.children.length === 0) {
+                alert('Please generate podcast script first');
+                return;
+            }
+
+            const translateBtn = document.getElementById('translateBtn');
+            translateBtn.disabled = true;
+            translateBtn.textContent = 'Translating...';
+
+            try {
+                // 收集所有对话内容
+                const dialogues = Array.from(podcastSections.querySelectorAll('.podcast-dialog')).map(dialog => {
+                    const host = dialog.querySelector('.host-label').textContent;
+                    const text = dialog.querySelector('textarea').value;
+                    return `[${host}]\n${text}`;
+                }).join('\n\n');
+
+                // 发送翻译请求
+                const response = await fetch('/translate-podcast', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ script: dialogues })
+                });
+
+                const data = await response.json();
+                if (!data.success) {
+                    throw new Error(data.error);
+                }
+
+                // 准备下载内容：原文和译文并排显示
+                const downloadContent = dialogues + '\n\n=== Chinese Translation ===\n\n' + data.translation;
+
+                // 下载文件
+                const blob = new Blob([downloadContent], { type: 'text/plain' });
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                downloadFile(blob, `podcast-script-bilingual-${timestamp}.txt`);
+
+            } catch (error) {
+                alert('Translation failed: ' + error.message);
+            } finally {
+                translateBtn.disabled = false;
+                translateBtn.textContent = 'Translate & Download';
+            }
+        }
+    </script>
+</body>
+</html> 

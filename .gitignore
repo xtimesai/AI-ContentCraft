@@ -1,0 +1,11 @@
+# 环境变量
+.env
+
+# 常见的需要忽略的文件/目录
+node_modules/
+dist/
+build/
+.DS_Store
+*.log
+.cache/
+coverage/ 
