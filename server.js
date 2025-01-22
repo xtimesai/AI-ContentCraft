@@ -5,28 +5,28 @@ import { fileURLToPath } from 'url';
 import fs from 'fs/promises';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import Replicate from "replicate";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 dotenv.config();
 
-// 定义 execAsync
+// Define execAsync
 const execAsync = promisify(exec);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const port = 3000;
 
-// 先设置中间件
+// Set up middleware
 app.use(express.json());
 app.use(express.static(__dirname));
 app.use('/output', express.static(path.join(__dirname, 'output')));
 
-// 创建 output 目录
+// Create output directory
 await fs.mkdir(path.join(__dirname, 'output'), { recursive: true });
 
-// 初始化 TTS
+// Initialize TTS
 console.log('Initializing TTS...');
 const model_id = "onnx-community/Kokoro-82M-ONNX";
 const tts = await KokoroTTS.from_pretrained(model_id, {
@@ -34,15 +34,19 @@ const tts = await KokoroTTS.from_pretrained(model_id, {
 });
 console.log('TTS initialized successfully');
 
-// 在初始化 OpenAI 之前添加 Replicate 客户端
+// Initialize Replicate client
 const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
 });
 
-// API 路由
+// Initialize Gemini API client
+const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = gemini.getGenerativeModel({ model: "gemini-pro" });
+
+// API Routes
 app.get('/voices', async (req, res) => {
     console.log('GET /voices request received');
-    // 硬编码声音列表
+    // Hardcoded voice list
     const voices = [
         { id: "af", name: "Default", language: "en-us", gender: "Female" },
         { id: "af_bella", name: "Bella", language: "en-us", gender: "Female" },
@@ -66,10 +70,10 @@ app.post('/generate', async (req, res) => {
         const audio = await tts.generate(text, {
             voice: voice,
         });
-        // 返回音频数据而不是保存文件
+        // Return audio data instead of saving file
         res.json({ 
             success: true,
-            audioData: audio.data // 返回音频数据
+            audioData: audio.data // Returns audio data
         });
     } catch (error) {
         res.status(500).json({ 
@@ -79,33 +83,33 @@ app.post('/generate', async (req, res) => {
     }
 });
 
-// 修改生成并合并音频的路由
+// Modify route to generate and merge audio
 app.post('/generate-and-merge', async (req, res) => {
     const { sections } = req.body;
     if (!sections || sections.length === 0) {
         return res.status(400).json({ 
             success: false, 
-            error: '没有有效的文本段落' 
+            error: 'No valid text sections' 
         });
     }
 
-    // 改进文件名生成逻辑
+    // Improved file name generation logic
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const outputFile = path.join(__dirname, `output/${timestamp}/audio.wav`);
     
     try {
-        // 创建临时目录和输出目录
+        // Create temporary directory and output directory
         const tempDir = path.join(__dirname, 'temp');
         const outputDir = path.join(__dirname, 'output', timestamp);
         await fs.mkdir(tempDir, { recursive: true });
         await fs.mkdir(outputDir, { recursive: true });
         
-        // 生成所有音频文件
+        // Generate all audio files
         const audioFiles = [];
         for (let i = 0; i < sections.length; i++) {
             const { text, voice } = sections[i];
             
-            // 发送进度更新
+            // Send progress updates
             res.write(JSON.stringify({
                 type: 'progress',
                 current: i + 1,
@@ -128,30 +132,47 @@ app.post('/generate-and-merge', async (req, res) => {
         }
 
         if (audioFiles.length > 0) {
-            // 发送合并开始通知
+            // Send merging start notification
             res.write(JSON.stringify({
                 type: 'status',
                 message: 'Merging audio files...'
             }) + '\n');
 
-            // 创建文件列表
+            // Create file list
             const listFile = path.join(tempDir, `list-${timestamp}.txt`);
             const fileList = audioFiles.map(f => `file '${f}'`).join('\n');
             await fs.writeFile(listFile, fileList);
 
-            // 合并音频文件
-            const ffmpegPath = '/Users/katemac/anaconda3/bin/ffmpeg';
+            // Merge audio files
+            const ffmpegPath = '/opt/homebrew/bin/ffmpeg'; // Modify if your ffmpeg location is different
             await execAsync(`"${ffmpegPath}" -f concat -safe 0 -i "${listFile}" -c copy "${outputFile}"`);
 
-            // 清理临时文件
-            await Promise.all([
-                ...audioFiles.map(f => fs.unlink(f)),
-                fs.unlink(listFile)
-            ]);
+            // Clean temporary files
+             // Clean up temporary files with error checking
+            try {
+                await Promise.all(audioFiles.map(f => fs.unlink(f)));
+                await fs.unlink(listFile);
+              } catch (err) {
+                  console.error('Error cleaning temp files', err);
+              }
+  
+            // Try to remove tempDir recursively
+           try {
+            await fs.rm(tempDir, { recursive: true });
+            } catch (err) {
+                 // try again, removing files first.
+                try {
+                    const files = await fs.readdir(tempDir);
+                    for (const file of files) {
+                       await fs.unlink(path.join(tempDir, file))
+                    }
+                    await fs.rm(tempDir, { recursive: true });
+                } catch (err) {
+                    console.error('Error removing temp dir, and trying to clean files first', err);
+                }
+              }
             
-            await fs.rmdir(tempDir);
-
-            // 发送完成消息
+            // Send complete message
             res.write(JSON.stringify({
                 type: 'complete',
                 success: true,
@@ -171,27 +192,19 @@ app.post('/generate-and-merge', async (req, res) => {
     }
 });
 
-// 修改生成故事的路由
+// Modify route to generate story
 app.post('/generate-story', async (req, res) => {
     const { theme } = req.body;
     try {
-        const response = await openai.chat.completions.create({
-            model: 'deepseek-chat',
-            messages: [
-                { 
-                    role: 'system', 
-                    content: 'You are a professional story writer. Create engaging and interesting short stories with good plot development.' 
-                },
-                { 
-                    role: 'user', 
-                    content: `Write a short story about "${theme}" in around 200 words` 
-                }
-            ],
-        });
+       const prompt = `You are a professional story writer. Create engaging and interesting short stories with good plot development. Write a short story about "${theme}" in around 200 words`;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const story = response.text();
         
         res.json({ 
             success: true,
-            story: response.choices[0].message.content 
+            story: story
         });
     } catch (error) {
         res.status(500).json({ 
@@ -201,85 +214,74 @@ app.post('/generate-story', async (req, res) => {
     }
 });
 
-// 修改生成脚本的路由
+
+// Modify route to generate script
 app.post('/generate-script', async (req, res) => {
     const { story } = req.body;
     
-    // 发送开始消息
+    // Send start message
     res.write(JSON.stringify({
         type: 'status',
         message: 'Converting story to script...'
     }) + '\n');
-
+    
     try {
-        const response = await openai.chat.completions.create({
-            model: 'deepseek-chat',
-            messages: [
-                { 
-                    role: 'system', 
-                    content: `Convert stories into dialogue format and return JSON format with these requirements:
-1. Convert any non-English text to English first
-2. Separate narration and dialogues
-3. Do not use asterisks (*) or any special formatting characters
-4. Format: 
-{
-  "scenes": [
-    {
-      "type": "narration",
-      "text": "scene description or narration"
-    },
-    {
-      "type": "dialogue",
-      "character": "Character Name",
-      "text": "dialogue content"
-    }
-  ]
-}
-5. Keep dialogues natural and concise
-6. Add scene descriptions where needed
-7. Maintain story flow and emotion
-8. Use appropriate names for characters` 
-                },
-                { 
-                    role: 'user', 
-                    content: `Convert this story into script format:\n${story}` 
-                }
-            ],
-            temperature: 0.7,
-            max_tokens: 2000
-        });
-        
-        // 发送生成完成消息
+        const prompt = `Convert stories into dialogue format and return JSON format with these requirements:
+        1. Convert any non-English text to English first
+        2. Separate narration and dialogues
+        3. Do not use asterisks (*) or any special formatting characters
+        4. Format: 
+        {
+        "scenes": [
+            {
+            "type": "narration",
+            "text": "scene description or narration"
+            },
+            {
+            "type": "dialogue",
+            "character": "Character Name",
+            "text": "dialogue content"
+            }
+        ]
+        }
+        5. Keep dialogues natural and concise
+        6. Add scene descriptions where needed
+        7. Maintain story flow and emotion
+        8. Use appropriate names for characters
+        Convert this story into script format:\n${story}`
+
+       const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const scriptContent = response.text();
+
+       // Send process script message
         res.write(JSON.stringify({
             type: 'status',
             message: 'Processing script format...'
         }) + '\n');
 
-        // 解析返回的 JSON 字符串
-        const scriptContent = response.choices[0].message.content;
-        let scriptData;
+       let scriptData;
         try {
-            // 尝试找到并提取 JSON 部分
-            const jsonMatch = scriptContent.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                scriptData = JSON.parse(jsonMatch[0]);
-            } else {
-                throw new Error('Invalid script format');
-            }
+           // Try to find JSON content and extract
+           const jsonMatch = scriptContent.match(/\{[\s\S]*\}/);
+           if (jsonMatch) {
+               scriptData = JSON.parse(jsonMatch[0]);
+           } else {
+               throw new Error('Invalid script format');
+           }
+           // Validate data format
+           if (!scriptData.scenes || !Array.isArray(scriptData.scenes)) {
+             throw new Error('Invalid script structure');
+           }
 
-            // 验证数据格式
-            if (!scriptData.scenes || !Array.isArray(scriptData.scenes)) {
-                throw new Error('Invalid script structure');
-            }
+          // Process the script content by removing all asterisks
+           scriptData.scenes = scriptData.scenes.map(scene => ({
+              ...scene,
+              text: scene.text.replace(/\*/g, ''),
+              ...(scene.character && { character: scene.character.replace(/\*/g, '') })
+           }));
 
-            // 处理脚本内容，移除所有星号
-            scriptData.scenes = scriptData.scenes.map(scene => ({
-                ...scene,
-                text: scene.text.replace(/\*/g, ''),
-                ...(scene.character && { character: scene.character.replace(/\*/g, '') })
-            }));
-
-            // 发送完成消息
+           // Send complete message
             res.write(JSON.stringify({
                 type: 'complete',
                 success: true,
@@ -291,6 +293,7 @@ app.post('/generate-script', async (req, res) => {
             console.error('Raw script content:', scriptContent);
             throw new Error('Failed to parse script format');
         }
+
     } catch (error) {
         console.error('Script generation error:', error);
         res.write(JSON.stringify({
@@ -301,27 +304,19 @@ app.post('/generate-script', async (req, res) => {
     }
 });
 
-// 添加播客生成路由
+// Add podcast generating route
 app.post('/generate-podcast', async (req, res) => {
     const { topic } = req.body;
     try {
-        const response = await openai.chat.completions.create({
-            model: 'deepseek-chat',
-            messages: [
-                { 
-                    role: 'system', 
-                    content: 'You are a professional podcast content creator. Create engaging and informative podcast content that is suitable for a conversation between two hosts.' 
-                },
-                { 
-                    role: 'user', 
-                    content: `Create a podcast discussion outline about "${topic}". The content should be informative and conversational.` 
-                }
-            ],
-        });
+        const prompt = `You are a professional podcast content creator. Create engaging and informative podcast content that is suitable for a conversation between two hosts. Create a podcast discussion outline about "${topic}". The content should be informative and conversational.`;
+
+       const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const content = response.text();
         
         res.json({ 
             success: true,
-            content: response.choices[0].message.content 
+            content: content
         });
     } catch (error) {
         res.status(500).json({ 
@@ -334,40 +329,32 @@ app.post('/generate-podcast', async (req, res) => {
 app.post('/generate-podcast-script', async (req, res) => {
     const { content } = req.body;
     try {
-        const response = await openai.chat.completions.create({
-            model: 'deepseek-chat',
-            messages: [
-                { 
-                    role: 'system', 
-                    content: `Convert content into a natural English conversation between two podcast hosts (A and B). Requirements:
-1. Format the response as JSON array of dialog objects
-2. Each object should have 'host' (either 'A' or 'B') and 'text' fields
-3. Keep the conversation natural and engaging
-4. Convert any non-English content to English
-Format example:
-[
-    {"host": "A", "text": "Welcome to our show..."},
-    {"host": "B", "text": "Today we're discussing..."}
-]` 
-                },
-                { 
-                    role: 'user', 
-                    content: `Convert this content into a podcast conversation:\n${content}` 
-                }
-            ],
-        });
+        const prompt = `Convert content into a natural English conversation between two podcast hosts (A and B). Requirements:
+        1. Format the response as JSON array of dialog objects
+        2. Each object should have 'host' (either 'A' or 'B') and 'text' fields
+        3. Keep the conversation natural and engaging
+        4. Convert any non-English content to English
+        Format example:
+        [
+            {"host": "A", "text": "Welcome to our show..."},
+            {"host": "B", "text": "Today we're discussing..."}
+        ]
+         Convert this content into a podcast conversation:\n${content}`;
+
+       const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const scriptContent = response.text();
         
-        const scriptContent = response.choices[0].message.content;
         let scriptData;
         try {
             scriptData = JSON.parse(scriptContent);
         } catch (e) {
-            const jsonMatch = scriptContent.match(/\[[\s\S]*\]/);
-            if (jsonMatch) {
-                scriptData = JSON.parse(jsonMatch[0]);
-            } else {
-                throw new Error('Invalid script format');
-            }
+           const jsonMatch = scriptContent.match(/\[[\s\S]*\]/);
+           if (jsonMatch) {
+              scriptData = JSON.parse(jsonMatch[0]);
+           } else {
+              throw new Error('Invalid script format');
+           }
         }
 
         res.json({ 
@@ -382,7 +369,7 @@ Format example:
     }
 });
 
-// 修改 generate-image-prompt 路由
+// Modify generate-image-prompt route
 app.post('/generate-image-prompt', async (req, res) => {
     const { text, context } = req.body;
     
@@ -392,41 +379,32 @@ app.post('/generate-image-prompt', async (req, res) => {
             error: 'Text is required' 
         });
     }
-
+    
     console.log('Generating prompt for text:', text);
     
     try {
-        const response = await openai.chat.completions.create({
-            model: 'deepseek-chat',
-            messages: [
-                { 
-                    role: 'system', 
-                    content: `You are a professional image prompt engineer. Create concise but detailed image prompts that maintain consistency.
+        const prompt = `You are a professional image prompt engineer. Create concise and detailed image prompts that maintain consistency and are appropriate for all audiences.
 
-Requirements:
-1. Keep prompts under 75 words
-2. Focus on key visual elements and maintain character/setting consistency
-3. Include artistic style and mood
-4. Avoid NSFW content
-5. Use natural, descriptive language
-6. Output in English only
+        Requirements:
+        1. Keep prompts under 75 words
+        2. Focus on key visual elements and maintain character/setting consistency. Do not focus on emotions, or subjective descriptions.
+        3. Include artistic style and mood but avoid any description that could be considered sensitive or inappropriate. Focus on descriptive terms for the visual elements, such as colors, lighting, style (e.g. realistic, cartoonish, painting etc.), and scene composition.
+        4. Do not include any potentially offensive, or NSFW subject matter, or any descriptions of violence, suffering, or anything that could be considered disturbing.
+        5. Use natural, descriptive language, focusing on visual elements (colors, objects, shapes, environment). Do not describe emotions, moods, or subjective impressions.
+        6. Output in English only
+        Story context:
+        ${context || 'No context provided'}
+        Create an image generation prompt for this scene that is family-friendly and follows the requirements: "${text}"`;
+    
+       const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const generatedPrompt = response.text();
 
-Story context:
-${context || 'No context provided'}` 
-                },
-                { 
-                    role: 'user', 
-                    content: `Create an image generation prompt for this scene while maintaining consistency with any provided context: "${text}"` 
-                }
-            ],
-        });
-
-        const prompt = response.choices[0].message.content;
-        console.log('Generated prompt:', prompt);
+        console.log('Generated prompt:', generatedPrompt);
         
         res.json({ 
             success: true,
-            prompt: prompt
+            prompt: generatedPrompt
         });
     } catch (error) {
         console.error('Prompt generation error:', error);
@@ -437,7 +415,7 @@ ${context || 'No context provided'}`
     }
 });
 
-// 修改 generate-image 路由
+// Modify generate-image route
 app.post('/generate-image', async (req, res) => {
     const { prompt, sectionId, seed = 1234 } = req.body;
     
@@ -465,16 +443,16 @@ app.post('/generate-image', async (req, res) => {
 
         console.log('Raw output from Replicate:', output);
 
-        // 改进输出处理逻辑
+        // Improved output handling logic
         let imageUrl;
         if (Array.isArray(output)) {
             imageUrl = output[0];
         } else if (typeof output === 'object' && output !== null) {
-            // 处理完整的 Replicate 响应对象
+            // Handle complete Replicate response object
             if (output.output && Array.isArray(output.output)) {
                 imageUrl = output.output[0];
             } else if (output.urls && output.urls.get) {
-                imageUrl = output.urls.get;
+               imageUrl = output.urls.get;
             }
         } else if (typeof output === 'string' && output.startsWith('http')) {
             imageUrl = output;
@@ -484,11 +462,11 @@ app.post('/generate-image', async (req, res) => {
             console.error('No valid image URL found in output:', output);
             throw new Error('No valid image URL in API response');
         }
-
-        // 确保 imageUrl 是字符串并且是有效的 URL
+        
+         // Ensure imageUrl is a string and a valid URL
         imageUrl = String(imageUrl);
         if (!imageUrl.startsWith('http')) {
-            throw new Error('Invalid image URL format');
+          throw new Error('Invalid image URL format');
         }
 
         console.log('Final image URL:', imageUrl);
@@ -512,46 +490,36 @@ app.post('/generate-image', async (req, res) => {
     }
 });
 
-// 修改 generate-all-images 路由
+// Modify generate-all-images route
 app.post('/generate-all-images', async (req, res) => {
     const { sections } = req.body;
     
     try {
-        // 发送开始消息
+        // Send start message
         res.write(JSON.stringify({
             type: 'status',
             message: 'Analyzing story context...'
         }) + '\n');
 
-        // 首先分析整个故事的上下文
-        const contextResponse = await openai.chat.completions.create({
-            model: 'deepseek-chat',
-            messages: [
-                { 
-                    role: 'system', 
-                    content: `Extract key story elements (characters, settings, themes) from the story sections. Keep it concise.` 
-                },
-                { 
-                    role: 'user', 
-                    content: `Analyze these story sections and extract key elements:\n${sections.map(s => s.text).join('\n\n')}` 
-                }
-            ],
-        });
-
-        const storyContext = contextResponse.choices[0].message.content;
+        // First analyze the whole story's context
+        const contextPrompt = `Extract key story elements (characters, settings, themes) from the story sections. Keep it concise.\nAnalyze these story sections and extract key elements:\n${sections.map(s => s.text).join('\n\n')}`;
+        
+        const contextResult = await model.generateContent(contextPrompt);
+        const contextResponse = await contextResult.response;
+        const storyContext = contextResponse.text();
         console.log('Story context:', storyContext);
 
-        // 发送提示词生成开始消息
+       // Send prompt generation start message
         res.write(JSON.stringify({
             type: 'status',
             message: 'Generating prompts...'
         }) + '\n');
 
-        // 生成所有提示词
+        // Generate all prompts
         const promptResults = [];
         for (let i = 0; i < sections.length; i++) {
             const section = sections[i];
-            
+
             res.write(JSON.stringify({
                 type: 'prompt_progress',
                 current: i + 1,
@@ -559,47 +527,39 @@ app.post('/generate-all-images', async (req, res) => {
                 message: `Generating prompt ${i + 1}/${sections.length}`
             }) + '\n');
 
-            const promptResponse = await openai.chat.completions.create({
-                model: 'deepseek-chat',
-                messages: [
-                    { 
-                        role: 'system', 
-                        content: `You are a professional image prompt engineer. Create concise but detailed image prompts that maintain consistency across a story.
+             const prompt = `You are a professional image prompt engineer. Create concise but detailed image prompts that maintain consistency across a story and are appropriate for all audiences.
 
-Requirements:
-1. Keep prompts under 75 words
-2. Focus on key visual elements and maintain character/setting consistency
-3. Include artistic style and mood
-4. Avoid NSFW content
-5. Use natural, descriptive language
-6. Output in English only
+            Requirements:
+            1. Keep prompts under 75 words
+            2. Focus on key visual elements and maintain character/setting consistency. Do not focus on emotions, or subjective descriptions.
+            3. Include artistic style and mood but avoid any description that could be considered sensitive or inappropriate. Focus on descriptive terms for the visual elements, such as colors, lighting, style (e.g. realistic, cartoonish, painting etc.), and scene composition.
+            4. Do not include any potentially offensive, or NSFW subject matter, or any descriptions of violence, suffering, or anything that could be considered disturbing.
+            5. Use natural, descriptive language, focusing on visual elements (colors, objects, shapes, environment). Do not describe emotions, moods, or subjective impressions.
+            6. Output in English only
 
-Story context:
-${storyContext}` 
-                    },
-                    { 
-                        role: 'user', 
-                        content: `Create an image generation prompt for this scene while maintaining consistency with the story context: "${section.text}"` 
-                    }
-                ],
-            });
-
-            promptResults.push({
+            Story context:
+            ${storyContext}
+            Create an image generation prompt for this scene that is family-friendly and follows the requirements: "${section.text}"`;
+         
+            const promptResult = await model.generateContent(prompt);
+            const promptResponse = await promptResult.response;
+            
+           promptResults.push({
                 sectionId: section.id,
-                prompt: promptResponse.choices[0].message.content
+                prompt: promptResponse.text()
             });
         }
 
-        // 发送开始生成图片的消息
+        // Send message that image generation is starting
         res.write(JSON.stringify({
             type: 'status',
             message: 'Generating images...'
         }) + '\n');
 
-        // 生成所有图片
+        // Generate all images
         for (let i = 0; i < promptResults.length; i++) {
-            const { sectionId, prompt } = promptResults[i];
-            
+           const { sectionId, prompt } = promptResults[i];
+
             res.write(JSON.stringify({
                 type: 'image_progress',
                 current: i + 1,
@@ -620,41 +580,41 @@ ${storyContext}`
                     }
                 );
 
-                console.log('Raw Replicate output:', output); // 添加日志
+                console.log('Raw Replicate output:', output); // Add logging
 
                 let imageUrl;
                 if (Array.isArray(output)) {
                     imageUrl = output[0];
-                    console.log('Array output, first item:', imageUrl);
+                   console.log('Array output, first item:', imageUrl);
                 } else if (typeof output === 'string') {
                     imageUrl = output;
                     console.log('String output:', imageUrl);
                 } else if (typeof output === 'object' && output !== null) {
-                    console.log('Object output:', output);
+                   console.log('Object output:', output);
                     if (output.output && Array.isArray(output.output)) {
                         imageUrl = output.output[0];
                     } else {
-                        imageUrl = output.url || output.output || output.image;
+                       imageUrl = output.url || output.output || output.image;
                     }
                 }
 
-                if (!imageUrl) {
-                    console.error('No valid image URL found in output:', output);
-                    throw new Error('No valid image URL in API response');
+               if (!imageUrl) {
+                   console.error('No valid image URL found in output:', output);
+                   throw new Error('No valid image URL in API response');
                 }
 
-                // 确保 imageUrl 是字符串
-                imageUrl = String(imageUrl);
+               // Make sure imageUrl is a string
+                 imageUrl = String(imageUrl);
                 console.log('Final image URL:', imageUrl);
 
-                res.write(JSON.stringify({
-                    type: 'section_complete',
-                    sectionId: sectionId,
-                    prompt: prompt,
-                    imageUrl: imageUrl,
-                    current: i + 1,
-                    total: promptResults.length
-                }) + '\n');
+               res.write(JSON.stringify({
+                  type: 'section_complete',
+                   sectionId: sectionId,
+                   prompt: prompt,
+                  imageUrl: imageUrl,
+                   current: i + 1,
+                   total: promptResults.length
+              }) + '\n');
 
             } catch (error) {
                 console.error(`Error generating image for section ${sectionId}:`, error);
@@ -671,13 +631,13 @@ ${storyContext}`
             }
         }
 
-        // 发送完成消息
+       // Send completion message
         res.write(JSON.stringify({
             type: 'complete',
             message: 'All images generated successfully'
         }));
-        res.end();
-
+       res.end();
+        
     } catch (error) {
         res.write(JSON.stringify({
             type: 'error',
@@ -687,23 +647,23 @@ ${storyContext}`
     }
 });
 
-// 修改批量下载图片的路由
+// Modify batch download images route
 app.post('/download-images', async (req, res) => {
     const { images, theme } = req.body;
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     
     try {
-        // 确保 output 目录存在
+        // Ensure that output directory exists
         const outputDir = path.join(__dirname, 'output');
         await fs.mkdir(outputDir, { recursive: true });
         
-        // 直接使用时间戳创建目录
+        // Create directory with timestamp
         const downloadDir = path.join(outputDir, timestamp);
         await fs.mkdir(downloadDir, { recursive: true });
         
         console.log('Downloading images to:', downloadDir);
         
-        // 下载所有图片
+       // Download all images
         for (let i = 0; i < images.length; i++) {
             const { url, prompt } = images[i];
             console.log(`Downloading image ${i + 1}/${images.length} from:`, url);
@@ -717,13 +677,13 @@ app.post('/download-images', async (req, res) => {
                 const arrayBuffer = await response.arrayBuffer();
                 const buffer = Buffer.from(arrayBuffer);
                 
-                const filename = `image-${String(i + 1).padStart(3, '0')}.webp`;
+               const filename = `image-${String(i + 1).padStart(3, '0')}.webp`;
                 const filePath = path.join(downloadDir, filename);
                 
                 await fs.writeFile(filePath, buffer);
                 console.log(`Saved image to:`, filePath);
-                
-                // 保存提示词到单独的文件
+
+                // save prompts in a separate file
                 await fs.appendFile(
                     path.join(downloadDir, 'prompts.txt'),
                     `Image ${i + 1}:\n${prompt}\nURL: ${url}\n\n`
@@ -737,7 +697,7 @@ app.post('/download-images', async (req, res) => {
             }
         }
         
-        // 创建一个简单的 HTML 预览文件，添加主题信息
+        // Create a simple HTML preview file, and adds theme information
         const htmlContent = `
 <!DOCTYPE html>
 <html>
@@ -765,13 +725,13 @@ app.post('/download-images', async (req, res) => {
     `).join('')}
 </body>
 </html>`;
-        
-        await fs.writeFile(path.join(downloadDir, 'gallery.html'), htmlContent);
-        
-        res.json({
-            success: true,
-            directory: path.relative(__dirname, downloadDir),
-            totalImages: images.length
+
+       await fs.writeFile(path.join(downloadDir, 'gallery.html'), htmlContent);
+
+       res.json({
+          success: true,
+          directory: path.relative(__dirname, downloadDir),
+          totalImages: images.length
         });
     } catch (error) {
         console.error('Error in download-images:', error);
@@ -782,16 +742,10 @@ app.post('/download-images', async (req, res) => {
     }
 });
 
-// 修改 OpenAI 客户端配置部分
-const openai = new OpenAI({
-    baseURL: 'https://api.deepseek.com/v1',
-    apiKey: process.env.DEEPSEEK_API_KEY || '', // 从环境变量读取
-});
-
-// 在 app.use 中间件部分添加
+// Add app.use middleware configuration
 app.use((req, res, next) => {
-    // 只允许本地域名访问
-    const allowedOrigins = ['http://localhost:3000', 'http://127.0.0.1:3000'];
+    // Allow access only from local addresses
+   const allowedOrigins = ['http://localhost:3000', 'http://127.0.0.1:3000'];
     const origin = req.headers.origin;
     
     if (allowedOrigins.includes(origin)) {
@@ -801,39 +755,29 @@ app.use((req, res, next) => {
     next();
 });
 
-// 添加翻译路由
+// Add translation routes
 app.post('/translate-podcast', async (req, res) => {
     const { script } = req.body;
     
     try {
-        const response = await openai.chat.completions.create({
-            model: 'deepseek-chat',
-            messages: [
-                { 
-                    role: 'system', 
-                    content: `Translate the podcast script to Chinese. Keep the format:
-1. Keep the Host A/B labels
-2. Translate naturally and maintain the conversation style
-3. Return in this format:
-[Host A]
-Chinese translation
+        const prompt = `Translate the podcast script to Chinese. Keep the format:
+        1. Keep the Host A/B labels
+        2. Translate naturally and maintain the conversation style
+        3. Return in this format:
+        [Host A]
+        Chinese translation
 
-[Host B]
-Chinese translation
-` 
-                },
-                { 
-                    role: 'user', 
-                    content: `Translate this podcast script to Chinese:\n${script}` 
-                }
-            ],
-            temperature: 0.7,
-            max_tokens: 2000
-        });
+        [Host B]
+        Chinese translation
+         Translate this podcast script to Chinese:\n${script}`;
+    
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const translation = response.text();
         
         res.json({ 
             success: true,
-            translation: response.choices[0].message.content 
+            translation: translation
         });
     } catch (error) {
         res.status(500).json({ 
@@ -843,40 +787,31 @@ Chinese translation
     }
 });
 
-// 添加故事脚本翻译路由
+// Add story script translation route
 app.post('/translate-story-script', async (req, res) => {
     const { script } = req.body;
     
     try {
-        const response = await openai.chat.completions.create({
-            model: 'deepseek-chat',
-            messages: [
-                { 
-                    role: 'system', 
-                    content: `Translate the story script to Chinese. Keep the format:
-1. Keep the [Narration] and [Dialogue] labels
-2. Translate naturally and maintain the story flow
-3. Return in this format:
-[Narration]
-Chinese translation
+        const prompt = `Translate the story script to Chinese. Keep the format:
+        1. Keep the [Narration] and [Dialogue] labels
+        2. Translate naturally and maintain the story flow
+        3. Return in this format:
+        [Narration]
+        Chinese translation
 
-[Dialogue]
-Character Name:
-Chinese translation
-` 
-                },
-                { 
-                    role: 'user', 
-                    content: `Translate this story script to Chinese:\n${script}` 
-                }
-            ],
-            temperature: 0.7,
-            max_tokens: 2000
-        });
+        [Dialogue]
+        Character Name:
+        Chinese translation
+
+         Translate this story script to Chinese:\n${script}`;
+    
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const translation = response.text();
         
         res.json({ 
             success: true,
-            translation: response.choices[0].message.content 
+            translation: translation
         });
     } catch (error) {
         res.status(500).json({ 
@@ -886,7 +821,8 @@ Chinese translation
     }
 });
 
-// 启动服务器
+
+// Start the server
 app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);
 });
