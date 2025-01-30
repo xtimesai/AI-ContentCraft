@@ -1,0 +1,14 @@
+[youtube] Extracting URL: https://www.youtube.com/watch?v=Ihug2-jT4X0
+[youtube] Ihug2-jT4X0: Downloading webpage
+[youtube] Ihug2-jT4X0: Downloading ios player API JSON
+[youtube] Ihug2-jT4X0: Downloading mweb player API JSON
+[youtube] Ihug2-jT4X0: Downloading player 1080ef44
+[youtube] Ihug2-jT4X0: Downloading m3u8 information
+[info] Ihug2-jT4X0: Downloading subtitles: en-orig, en
+[info] Ihug2-jT4X0: Downloading 1 format(s): 616+251
+[info] Writing video subtitles to: Ihug2-jT4X0.en-orig.json3
+[download] Destination: Ihug2-jT4X0.en-orig.json3
+[download]    1.00KiB at  350.75KiB/s (00:00:00)[download]    3.00KiB at  960.89KiB/s (00:00:00)[download]    7.00KiB at    2.03MiB/s (00:00:00)[download]   15.00KiB at    3.99MiB/s (00:00:00)[download]   31.00KiB at    7.67MiB/s (00:00:00)[download]   63.00KiB at   13.41MiB/s (00:00:00)[download]  127.00KiB at   21.46MiB/s (00:00:00)[download]  144.36KiB at   23.01MiB/s (00:00:00)[download] 100% of  144.36KiB in 00:00:00 at 1.88MiB/s
+[info] Writing video subtitles to: Ihug2-jT4X0.en.json3
+[download] Destination: Ihug2-jT4X0.en.json3
+[download]    1.00KiB at  518.14KiB/s (00:00:00)[download]    3.00KiB at    1.22MiB/s (00:00:00)[download]    7.00KiB at    2.59MiB/s (00:00:00)[download]   15.00KiB at    4.73MiB/s (00:00:00)[download]   31.00KiB at    8.97MiB/s (00:00:00)[download]   63.00KiB at   16.82MiB/s (00:00:00)[download]  127.00KiB at   28.20MiB/s (00:00:00)[download]  144.36KiB at   28.40MiB/s (00:00:00)[download] 100% of  144.36KiB in 00:00:00 at 865.54KiB/s
