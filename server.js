@@ -7,7 +7,10 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import dotenv from 'dotenv';
 import Replicate from "replicate";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI } from "@google/generative-ai"; // Correct import for Gemini API
+import ytdl from 'ytdl-core';
+import ffmpeg from 'fluent-ffmpeg';
+import fs_sync from 'fs';
 
 dotenv.config();
 
@@ -36,12 +39,82 @@ console.log('TTS initialized successfully');
 
 // Initialize Replicate client
 const replicate = new Replicate({
-  auth: process.env.REPLICATE_API_TOKEN,
+    auth: process.env.REPLICATE_API_TOKEN,
 });
 
 // Initialize Gemini API client
 const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = gemini.getGenerativeModel({ model: "gemini-pro" });
+
+// --- YouTube Audio Download Function ---
+async function downloadYouTubeAudio(url, outputDir = null) {
+    return new Promise(async (resolve, reject) => {
+        try {
+            const output_path = outputDir || path.join(__dirname, 'output'); // Default output to server's output dir
+            if (!fs_sync.existsSync(output_path)) {
+                fs_sync.mkdirSync(output_path, { recursive: true });
+            }
+
+            const info = await ytdl.getInfo(url);
+            const audioFormat = ytdl.filterFormats(info.formats, { audioonly: true, quality: 'highestaudio' })[0];
+
+            if (!audioFormat) {
+                reject("No suitable audio format found for download.");
+                return;
+            }
+
+            const videoTitle = info.videoDetails.title;
+            const safeTitle = videoTitle.replace(/[^a-zA-Z0-9\s_-]/g, '').trim();
+            const tempFile = path.join(output_path, `${safeTitle}_temp.${audioFormat.container}`); // Use container from audioFormat
+            const mp3Path = path.join(output_path, `${safeTitle}.mp3`);
+
+            console.log(`Downloading audio from: ${videoTitle}`);
+
+            const audioStream = ytdl.downloadFromInfo(info, { format: audioFormat });
+            const writeStream = fs_sync.createWriteStream(tempFile);
+
+            audioStream.pipe(writeStream);
+
+            writeStream.on('finish', () => {
+                console.log("Audio download complete. Converting to MP3...");
+
+                const ffmpegPath = '/opt/homebrew/bin/ffmpeg'; // Modify if your ffmpeg location is different
+
+                ffmpeg(tempFile)
+                    .audioCodec('libmp3lame')
+                    .audioQuality(0) // 0 is the highest quality for libmp3lame, adjust as needed (0-9, 0 is best)
+                    .toFormat('mp3')
+                    .on('start', function(commandLine) {
+                        console.log('FFmpeg command: ' + commandLine); // Log the FFmpeg command
+                    })
+                    .on('error', function(err) {
+                        fs_sync.unlinkSync(tempFile); // Clean up temp file on error
+                        console.error('FFmpeg conversion error:', err);
+                        reject(`FFmpeg conversion failed: ${err.message}`);
+                    })
+                    .on('end', function() {
+                        fs_sync.unlinkSync(tempFile); // Delete the temporary file
+                        console.log(`Audio downloaded and converted successfully: ${mp3Path}`);
+                        resolve(mp3Path);
+                    })
+                    .save(mp3Path);
+            });
+
+            audioStream.on('error', (err) => {
+                fs_sync.unlinkSync(tempFile); // Clean up temp file if download fails
+                console.error("YouTube download error:", err);
+                reject(`YouTube download failed: ${err.message}`);
+            });
+
+
+        } catch (error) {
+            console.error("An error occurred:", error);
+            reject(`An error occurred: ${error.message}`);
+        }
+    });
+}
+// --- End of YouTube Audio Download Function ---
+
 
 // API Routes
 app.get('/voices', async (req, res) => {
@@ -65,20 +138,20 @@ app.get('/voices', async (req, res) => {
 
 app.post('/generate', async (req, res) => {
     const { text, voice = "af_nicole" } = req.body;
-    
+
     try {
         const audio = await tts.generate(text, {
             voice: voice,
         });
         // Return audio data instead of saving file
-        res.json({ 
+        res.json({
             success: true,
             audioData: audio.data // Returns audio data
         });
     } catch (error) {
-        res.status(500).json({ 
-            success: false, 
-            error: error.message 
+        res.status(500).json({
+            success: false,
+            error: error.message
         });
     }
 });
@@ -87,28 +160,28 @@ app.post('/generate', async (req, res) => {
 app.post('/generate-and-merge', async (req, res) => {
     const { sections } = req.body;
     if (!sections || sections.length === 0) {
-        return res.status(400).json({ 
-            success: false, 
-            error: 'No valid text sections' 
+        return res.status(400).json({
+            success: false,
+            error: 'No valid text sections'
         });
     }
 
     // Improved file name generation logic
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const outputFile = path.join(__dirname, `output/${timestamp}/audio.wav`);
-    
+
     try {
         // Create temporary directory and output directory
         const tempDir = path.join(__dirname, 'temp');
         const outputDir = path.join(__dirname, 'output', timestamp);
         await fs.mkdir(tempDir, { recursive: true });
         await fs.mkdir(outputDir, { recursive: true });
-        
+
         // Generate all audio files
         const audioFiles = [];
         for (let i = 0; i < sections.length; i++) {
             const { text, voice } = sections[i];
-            
+
             // Send progress updates
             res.write(JSON.stringify({
                 type: 'progress',
@@ -148,30 +221,30 @@ app.post('/generate-and-merge', async (req, res) => {
             await execAsync(`"${ffmpegPath}" -f concat -safe 0 -i "${listFile}" -c copy "${outputFile}"`);
 
             // Clean temporary files
-             // Clean up temporary files with error checking
+            // Clean up temporary files with error checking
             try {
                 await Promise.all(audioFiles.map(f => fs.unlink(f)));
                 await fs.unlink(listFile);
-              } catch (err) {
-                  console.error('Error cleaning temp files', err);
-              }
-  
-            // Try to remove tempDir recursively
-           try {
-            await fs.rm(tempDir, { recursive: true });
             } catch (err) {
-                 // try again, removing files first.
+                console.error('Error cleaning temp files', err);
+            }
+
+            // Try to remove tempDir recursively
+            try {
+                await fs.rm(tempDir, { recursive: true });
+            } catch (err) {
+                // try again, removing files first.
                 try {
                     const files = await fs.readdir(tempDir);
                     for (const file of files) {
-                       await fs.unlink(path.join(tempDir, file))
+                        await fs.unlink(path.join(tempDir, file))
                     }
                     await fs.rm(tempDir, { recursive: true });
                 } catch (err) {
                     console.error('Error removing temp dir, and trying to clean files first', err);
                 }
-              }
-            
+            }
+
             // Send complete message
             res.write(JSON.stringify({
                 type: 'complete',
@@ -192,24 +265,59 @@ app.post('/generate-and-merge', async (req, res) => {
     }
 });
 
+// New route to download YouTube audio
+app.post('/download-youtube-audio', async (req, res) => {
+    const { youtubeUrl } = req.body;
+
+    if (!youtubeUrl) {
+        return res.status(400).json({
+            success: false,
+            error: 'YouTube URL is required'
+        });
+    }
+
+    try {
+        const mp3FilePath = await downloadYouTubeAudio(youtubeUrl);
+        if (mp3FilePath) {
+            res.json({
+                success: true,
+                message: 'Audio downloaded successfully',
+                filePath: path.relative(__dirname, mp3FilePath) // Send relative path to be accessible via /output
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                error: 'Audio download failed'
+            });
+        }
+    } catch (error) {
+        console.error('YouTube audio download error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Failed to download YouTube audio'
+        });
+    }
+});
+
+
 // Modify route to generate story
 app.post('/generate-story', async (req, res) => {
     const { theme } = req.body;
     try {
-       const prompt = `You are a professional story writer. Create engaging and interesting short stories with good plot development. Write a short story about "${theme}" in around 200 words`;
+        const prompt = `You are a professional story writer. Create engaging and interesting short stories with good plot development. Write a short story about "${theme}" in around 200 words`;
 
         const result = await model.generateContent(prompt);
         const response = await result.response;
         const story = response.text();
-        
-        res.json({ 
+
+        res.json({
             success: true,
             story: story
         });
     } catch (error) {
-        res.status(500).json({ 
-            success: false, 
-            error: error.message 
+        res.status(500).json({
+            success: false,
+            error: error.message
         });
     }
 });
@@ -218,19 +326,19 @@ app.post('/generate-story', async (req, res) => {
 // Modify route to generate script
 app.post('/generate-script', async (req, res) => {
     const { story } = req.body;
-    
+
     // Send start message
     res.write(JSON.stringify({
         type: 'status',
         message: 'Converting story to script...'
     }) + '\n');
-    
+
     try {
         const prompt = `Convert stories into dialogue format and return JSON format with these requirements:
         1. Convert any non-English text to English first
         2. Separate narration and dialogues
         3. Do not use asterisks (*) or any special formatting characters
-        4. Format: 
+        4. Format:
         {
         "scenes": [
             {
@@ -250,38 +358,38 @@ app.post('/generate-script', async (req, res) => {
         8. Use appropriate names for characters
         Convert this story into script format:\n${story}`
 
-       const result = await model.generateContent(prompt);
+        const result = await model.generateContent(prompt);
         const response = await result.response;
         const scriptContent = response.text();
 
-       // Send process script message
+        // Send process script message
         res.write(JSON.stringify({
             type: 'status',
             message: 'Processing script format...'
         }) + '\n');
 
-       let scriptData;
+        let scriptData;
         try {
-           // Try to find JSON content and extract
-           const jsonMatch = scriptContent.match(/\{[\s\S]*\}/);
-           if (jsonMatch) {
-               scriptData = JSON.parse(jsonMatch[0]);
-           } else {
-               throw new Error('Invalid script format');
-           }
-           // Validate data format
-           if (!scriptData.scenes || !Array.isArray(scriptData.scenes)) {
-             throw new Error('Invalid script structure');
-           }
+            // Try to find JSON content and extract
+            const jsonMatch = scriptContent.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                scriptData = JSON.parse(jsonMatch[0]);
+            } else {
+                throw new Error('Invalid script format');
+            }
+            // Validate data format
+            if (!scriptData.scenes || !Array.isArray(scriptData.scenes)) {
+                throw new Error('Invalid script structure');
+            }
 
-          // Process the script content by removing all asterisks
-           scriptData.scenes = scriptData.scenes.map(scene => ({
-              ...scene,
-              text: scene.text.replace(/\*/g, ''),
-              ...(scene.character && { character: scene.character.replace(/\*/g, '') })
-           }));
+            // Process the script content by removing all asterisks
+            scriptData.scenes = scriptData.scenes.map(scene => ({
+                ...scene,
+                text: scene.text.replace(/\*/g, ''),
+                ...(scene.character && { character: scene.character.replace(/\*/g, '') })
+            }));
 
-           // Send complete message
+            // Send complete message
             res.write(JSON.stringify({
                 type: 'complete',
                 success: true,
@@ -310,18 +418,18 @@ app.post('/generate-podcast', async (req, res) => {
     try {
         const prompt = `You are a professional podcast content creator. Create engaging and informative podcast content that is suitable for a conversation between two hosts. Create a podcast discussion outline about "${topic}". The content should be informative and conversational.`;
 
-       const result = await model.generateContent(prompt);
+        const result = await model.generateContent(prompt);
         const response = await result.response;
         const content = response.text();
-        
-        res.json({ 
+
+        res.json({
             success: true,
             content: content
         });
     } catch (error) {
-        res.status(500).json({ 
-            success: false, 
-            error: error.message 
+        res.status(500).json({
+            success: false,
+            error: error.message
         });
     }
 });
@@ -341,30 +449,30 @@ app.post('/generate-podcast-script', async (req, res) => {
         ]
          Convert this content into a podcast conversation:\n${content}`;
 
-       const result = await model.generateContent(prompt);
+        const result = await model.generateContent(prompt);
         const response = await result.response;
         const scriptContent = response.text();
-        
+
         let scriptData;
         try {
             scriptData = JSON.parse(scriptContent);
         } catch (e) {
-           const jsonMatch = scriptContent.match(/\[[\s\S]*\]/);
-           if (jsonMatch) {
-              scriptData = JSON.parse(jsonMatch[0]);
-           } else {
-              throw new Error('Invalid script format');
-           }
+            const jsonMatch = scriptContent.match(/\[[\s\S]*\]/);
+            if (jsonMatch) {
+                scriptData = JSON.parse(jsonMatch[0]);
+            } else {
+                throw new Error('Invalid script format');
+            }
         }
 
-        res.json({ 
+        res.json({
             success: true,
             script: scriptData
         });
     } catch (error) {
-        res.status(500).json({ 
-            success: false, 
-            error: error.message 
+        res.status(500).json({
+            success: false,
+            error: error.message
         });
     }
 });
@@ -372,16 +480,16 @@ app.post('/generate-podcast-script', async (req, res) => {
 // Modify generate-image-prompt route
 app.post('/generate-image-prompt', async (req, res) => {
     const { text, context } = req.body;
-    
+
     if (!text) {
-        return res.status(400).json({ 
-            success: false, 
-            error: 'Text is required' 
+        return res.status(400).json({
+            success: false,
+            error: 'Text is required'
         });
     }
-    
+
     console.log('Generating prompt for text:', text);
-    
+
     try {
         const prompt = `You are a professional image prompt engineer. Create concise and detailed image prompts that maintain consistency and are appropriate for all audiences.
 
@@ -395,21 +503,21 @@ app.post('/generate-image-prompt', async (req, res) => {
         Story context:
         ${context || 'No context provided'}
         Create an image generation prompt for this scene that is family-friendly and follows the requirements: "${text}"`;
-    
-       const result = await model.generateContent(prompt);
+
+        const result = await model.generateContent(prompt);
         const response = await result.response;
         const generatedPrompt = response.text();
 
         console.log('Generated prompt:', generatedPrompt);
-        
-        res.json({ 
+
+        res.json({
             success: true,
             prompt: generatedPrompt
         });
     } catch (error) {
         console.error('Prompt generation error:', error);
-        res.status(500).json({ 
-            success: false, 
+        res.status(500).json({
+            success: false,
             error: error.message || 'Failed to generate prompt'
         });
     }
@@ -418,16 +526,16 @@ app.post('/generate-image-prompt', async (req, res) => {
 // Modify generate-image route
 app.post('/generate-image', async (req, res) => {
     const { prompt, sectionId, seed = 1234 } = req.body;
-    
+
     if (!prompt) {
-        return res.status(400).json({ 
-            success: false, 
-            error: 'Prompt is required' 
+        return res.status(400).json({
+            success: false,
+            error: 'Prompt is required'
         });
     }
-    
+
     console.log('Generating image for prompt:', prompt);
-    
+
     try {
         const output = await replicate.run(
             "black-forest-labs/flux-schnell",
@@ -452,7 +560,7 @@ app.post('/generate-image', async (req, res) => {
             if (output.output && Array.isArray(output.output)) {
                 imageUrl = output.output[0];
             } else if (output.urls && output.urls.get) {
-               imageUrl = output.urls.get;
+                imageUrl = output.urls.get;
             }
         } else if (typeof output === 'string' && output.startsWith('http')) {
             imageUrl = output;
@@ -462,16 +570,16 @@ app.post('/generate-image', async (req, res) => {
             console.error('No valid image URL found in output:', output);
             throw new Error('No valid image URL in API response');
         }
-        
-         // Ensure imageUrl is a string and a valid URL
+
+        // Ensure imageUrl is a string and a valid URL
         imageUrl = String(imageUrl);
         if (!imageUrl.startsWith('http')) {
-          throw new Error('Invalid image URL format');
+            throw new Error('Invalid image URL format');
         }
 
         console.log('Final image URL:', imageUrl);
 
-        res.json({ 
+        res.json({
             success: true,
             imageUrl: imageUrl,
             sectionId: sectionId
@@ -483,8 +591,8 @@ app.post('/generate-image', async (req, res) => {
             stack: error.stack,
             name: error.name
         });
-        res.status(500).json({ 
-            success: false, 
+        res.status(500).json({
+            success: false,
             error: error.message || 'Failed to generate image'
         });
     }
@@ -493,7 +601,7 @@ app.post('/generate-image', async (req, res) => {
 // Modify generate-all-images route
 app.post('/generate-all-images', async (req, res) => {
     const { sections } = req.body;
-    
+
     try {
         // Send start message
         res.write(JSON.stringify({
@@ -503,13 +611,13 @@ app.post('/generate-all-images', async (req, res) => {
 
         // First analyze the whole story's context
         const contextPrompt = `Extract key story elements (characters, settings, themes) from the story sections. Keep it concise.\nAnalyze these story sections and extract key elements:\n${sections.map(s => s.text).join('\n\n')}`;
-        
+
         const contextResult = await model.generateContent(contextPrompt);
         const contextResponse = await contextResult.response;
         const storyContext = contextResponse.text();
         console.log('Story context:', storyContext);
 
-       // Send prompt generation start message
+        // Send prompt generation start message
         res.write(JSON.stringify({
             type: 'status',
             message: 'Generating prompts...'
@@ -527,7 +635,7 @@ app.post('/generate-all-images', async (req, res) => {
                 message: `Generating prompt ${i + 1}/${sections.length}`
             }) + '\n');
 
-             const prompt = `You are a professional image prompt engineer. Create concise but detailed image prompts that maintain consistency across a story and are appropriate for all audiences.
+            const prompt = `You are a professional image prompt engineer. Create concise but detailed image prompts that maintain consistency across a story and are appropriate for all audiences.
 
             Requirements:
             1. Keep prompts under 75 words
@@ -540,11 +648,11 @@ app.post('/generate-all-images', async (req, res) => {
             Story context:
             ${storyContext}
             Create an image generation prompt for this scene that is family-friendly and follows the requirements: "${section.text}"`;
-         
+
             const promptResult = await model.generateContent(prompt);
             const promptResponse = await promptResult.response;
-            
-           promptResults.push({
+
+            promptResults.push({
                 sectionId: section.id,
                 prompt: promptResponse.text()
             });
@@ -558,7 +666,7 @@ app.post('/generate-all-images', async (req, res) => {
 
         // Generate all images
         for (let i = 0; i < promptResults.length; i++) {
-           const { sectionId, prompt } = promptResults[i];
+            const { sectionId, prompt } = promptResults[i];
 
             res.write(JSON.stringify({
                 type: 'image_progress',
@@ -585,36 +693,36 @@ app.post('/generate-all-images', async (req, res) => {
                 let imageUrl;
                 if (Array.isArray(output)) {
                     imageUrl = output[0];
-                   console.log('Array output, first item:', imageUrl);
+                    console.log('Array output, first item:', imageUrl);
                 } else if (typeof output === 'string') {
                     imageUrl = output;
                     console.log('String output:', imageUrl);
                 } else if (typeof output === 'object' && output !== null) {
-                   console.log('Object output:', output);
+                    console.log('Object output:', output);
                     if (output.output && Array.isArray(output.output)) {
                         imageUrl = output.output[0];
                     } else {
-                       imageUrl = output.url || output.output || output.image;
+                        imageUrl = output.url || output.output || output.image;
                     }
                 }
 
-               if (!imageUrl) {
-                   console.error('No valid image URL found in output:', output);
-                   throw new Error('No valid image URL in API response');
+                if (!imageUrl) {
+                    console.error('No valid image URL found in output:', output);
+                    throw new Error('No valid image URL in API response');
                 }
 
-               // Make sure imageUrl is a string
-                 imageUrl = String(imageUrl);
+                // Make sure imageUrl is a string
+                imageUrl = String(imageUrl);
                 console.log('Final image URL:', imageUrl);
 
-               res.write(JSON.stringify({
-                  type: 'section_complete',
-                   sectionId: sectionId,
-                   prompt: prompt,
-                  imageUrl: imageUrl,
-                   current: i + 1,
-                   total: promptResults.length
-              }) + '\n');
+                res.write(JSON.stringify({
+                    type: 'section_complete',
+                    sectionId: sectionId,
+                    prompt: prompt,
+                    imageUrl: imageUrl,
+                    current: i + 1,
+                    total: promptResults.length
+                }) + '\n');
 
             } catch (error) {
                 console.error(`Error generating image for section ${sectionId}:`, error);
@@ -631,13 +739,13 @@ app.post('/generate-all-images', async (req, res) => {
             }
         }
 
-       // Send completion message
+        // Send completion message
         res.write(JSON.stringify({
             type: 'complete',
             message: 'All images generated successfully'
         }));
-       res.end();
-        
+        res.end();
+
     } catch (error) {
         res.write(JSON.stringify({
             type: 'error',
@@ -651,35 +759,35 @@ app.post('/generate-all-images', async (req, res) => {
 app.post('/download-images', async (req, res) => {
     const { images, theme } = req.body;
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    
+
     try {
         // Ensure that output directory exists
         const outputDir = path.join(__dirname, 'output');
         await fs.mkdir(outputDir, { recursive: true });
-        
+
         // Create directory with timestamp
         const downloadDir = path.join(outputDir, timestamp);
         await fs.mkdir(downloadDir, { recursive: true });
-        
+
         console.log('Downloading images to:', downloadDir);
-        
-       // Download all images
+
+        // Download all images
         for (let i = 0; i < images.length; i++) {
             const { url, prompt } = images[i];
             console.log(`Downloading image ${i + 1}/${images.length} from:`, url);
-            
+
             try {
                 const response = await fetch(url);
                 if (!response.ok) {
                     throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
                 }
-                
+
                 const arrayBuffer = await response.arrayBuffer();
                 const buffer = Buffer.from(arrayBuffer);
-                
-               const filename = `image-${String(i + 1).padStart(3, '0')}.webp`;
+
+                const filename = `image-${String(i + 1).padStart(3, '0')}.webp`;
                 const filePath = path.join(downloadDir, filename);
-                
+
                 await fs.writeFile(filePath, buffer);
                 console.log(`Saved image to:`, filePath);
 
@@ -696,7 +804,7 @@ app.post('/download-images', async (req, res) => {
                 );
             }
         }
-        
+
         // Create a simple HTML preview file, and adds theme information
         const htmlContent = `
 <!DOCTYPE html>
@@ -726,12 +834,12 @@ app.post('/download-images', async (req, res) => {
 </body>
 </html>`;
 
-       await fs.writeFile(path.join(downloadDir, 'gallery.html'), htmlContent);
+        await fs.writeFile(path.join(downloadDir, 'gallery.html'), htmlContent);
 
-       res.json({
-          success: true,
-          directory: path.relative(__dirname, downloadDir),
-          totalImages: images.length
+        res.json({
+            success: true,
+            directory: path.relative(__dirname, downloadDir),
+            totalImages: images.length
         });
     } catch (error) {
         console.error('Error in download-images:', error);
@@ -742,23 +850,11 @@ app.post('/download-images', async (req, res) => {
     }
 });
 
-// Add app.use middleware configuration
-app.use((req, res, next) => {
-    // Allow access only from local addresses
-   const allowedOrigins = ['http://localhost:3000', 'http://127.0.0.1:3000'];
-    const origin = req.headers.origin;
-    
-    if (allowedOrigins.includes(origin)) {
-        res.header('Access-Control-Allow-Origin', origin);
-        res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-    }
-    next();
-});
 
 // Add translation routes
 app.post('/translate-podcast', async (req, res) => {
     const { script } = req.body;
-    
+
     try {
         const prompt = `Translate the podcast script to Chinese. Keep the format:
         1. Keep the Host A/B labels
@@ -770,19 +866,19 @@ app.post('/translate-podcast', async (req, res) => {
         [Host B]
         Chinese translation
          Translate this podcast script to Chinese:\n${script}`;
-    
+
         const result = await model.generateContent(prompt);
         const response = await result.response;
         const translation = response.text();
-        
-        res.json({ 
+
+        res.json({
             success: true,
             translation: translation
         });
     } catch (error) {
-        res.status(500).json({ 
-            success: false, 
-            error: error.message 
+        res.status(500).json({
+            success: false,
+            error: error.message
         });
     }
 });
@@ -790,7 +886,7 @@ app.post('/translate-podcast', async (req, res) => {
 // Add story script translation route
 app.post('/translate-story-script', async (req, res) => {
     const { script } = req.body;
-    
+
     try {
         const prompt = `Translate the story script to Chinese. Keep the format:
         1. Keep the [Narration] and [Dialogue] labels
@@ -804,19 +900,19 @@ app.post('/translate-story-script', async (req, res) => {
         Chinese translation
 
          Translate this story script to Chinese:\n${script}`;
-    
+
         const result = await model.generateContent(prompt);
         const response = await result.response;
         const translation = response.text();
-        
-        res.json({ 
+
+        res.json({
             success: true,
             translation: translation
         });
     } catch (error) {
-        res.status(500).json({ 
-            success: false, 
-            error: error.message 
+        res.status(500).json({
+            success: false,
+            error: error.message
         });
     }
 });
