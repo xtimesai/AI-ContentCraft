@@ -16,6 +16,16 @@ AI ContentCraft is a versatile content creation tool that integrates text genera
 - 🌐 Bilingual Support: Support for Chinese-English content conversion
 - 📊 Batch Processing: Support batch generation and download of content
 
+## Demo
+
+### Screenshots
+![Story Generation](https://r2.kateviews.com/20250120_670.png)
+![Podcast Creation](https://r2.kateviews.com/20250120_171.png)
+
+### Video Demos
+- [🎬 Bilibili demo](https://www.bilibili.com/video/BV1a8w6eaELj/)
+- [🎬 Youtube demo](https://www.youtube.com/watch?v=2xEOzjsiFUY)
+
 ## Tech Stack
 
 - Frontend: HTML/JavaScript
@@ -159,6 +169,16 @@ AI ContentCraft 是一个多功能的内容创作工具，集成了文本生成�
 - 🎨 图像生成：为故事场景生成配图
 - 🌐 双语支持：支持内容的中英文转换
 - 📊 批量处理：支持批量生成和下载内容
+
+## 演示
+
+### 应用截图
+![故事生成](https://r2.kateviews.com/20250120_670.png)
+![播客创作](https://r2.kateviews.com/20250120_171.png)
+
+### 视频演示
+- [🎬 B站演示](https://www.bilibili.com/video/BV1a8w6eaELj/)
+- [🎬 Youtube演示](https://www.youtube.com/watch?v=2xEOzjsiFUY)
 
 ## 技术栈
 
