@@ -1,3 +1,0 @@
-file 'C:\Users\daily\OneDrive\Documents\GitHub\AI-ContentCraft\temp\temp-0.wav'
-file 'C:\Users\daily\OneDrive\Documents\GitHub\AI-ContentCraft\temp\temp-1.wav'
-file 'C:\Users\daily\OneDrive\Documents\GitHub\AI-ContentCraft\temp\temp-2.wav'
